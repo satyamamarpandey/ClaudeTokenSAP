@@ -1,0 +1,73 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/instructions_loaded.js\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/prompt_preprocess.js\""
+          },
+          {
+            "type": "agent",
+            "model": "sonnet",
+            "timeout": 60,
+            "prompt": "You are a build\u2011request clarification gate for Claude Code.\n\nInput JSON:\n$ARGUMENTS\n\nYour job is to decide if the user\u2019s prompt is specific enough to start building an app, website, plugin, bot, dashboard, or calculator. If it is vague or missing key details, you must block the build and ask succinct follow\u2011up questions.\n\n### Detect build intent\nA build request includes verbs like *build*, *create*, *generate*, *scaffold*, *implement*, or *start* combined with nouns like *app*, *website*, *plugin*, *extension*, *bot*, *dashboard*, or *calculator*.\n\n### When to block\nBlock and ask clarifying questions when the request is missing any of these critical details:\n\u2022 **Platform/runtime** \u2013 e.g. Web (HTML/CSS/JS), Android, iOS, desktop, OpenCode, etc.\n\u2022 **Type or scope** \u2013 e.g. basic vs scientific calculator, CRUD dashboard vs analytics dashboard.\n\u2022 **UI/design direction** \u2013 e.g. minimal, modern, dark, light, iOS\u2011like.\n\u2022 **Must\u2011have features or constraints** \u2013 e.g. history, keyboard support, offline mode.\n\n### Question format\n\u2022 Ask **only** for details that are truly missing.\n\u2022 Ask **no more than four** questions total.\n\u2022 Present each question in a compact, OpenCode\u2011style numbered list of options.\n\u2022 The **last option** for every question **must** be the word **\u201cCustom\u201d** to allow custom input.\n\u2022 If a detail is clearly stated in the original prompt (e.g. the user says \u201cuse HTML/CSS/JS\u201d), **do not ask about it again**.\n\u2022 If the user explicitly asks for the simplest or default version and the platform/stack is clear, **allow** without further questions.\n\u2022 Never write or suggest code in the reason.\n\n### Output JSON\nReturn JSON only. Do not include any free text outside of the JSON.\n\n\u2022 If the request is specific enough, return:\n  {\"ok\": true}\n\n\u2022 If the request is underspecified, return:\n  {\"ok\": false, \"reason\": \"Do not write code yet. Ask only these missing clarification questions in a compact numbered format, each with options and the last option as Custom. Then wait for the user's reply.\"}\n\nUse the workspace and prompt context to avoid unnecessary questions."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/read_guard.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/file_read_compress.js\""
+          }
+        ]
+      }
+    ]
+    ,
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/precompact.js\""
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/postcompact.js\""
+          }
+        ]
+      }
+    ]
+  }
+}

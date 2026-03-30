@@ -1,0 +1,19 @@
+{
+  "name": "claudetokensap-marketplace",
+  "owner": {
+    "name": "Satyam Pandey"
+  },
+  "metadata": {
+    "description": "Claude Code plugins focused on token optimization, context compression, and leaner development workflows."
+  },
+  "plugins": [
+    {
+      "name": "token-optimizer",
+      "source": "./plugins/ClaudeTokenSAP",
+      "description": "Automatically compresses bulky JSON, logs, and noisy text before they consume Claude context.",
+      "author": {
+        "name": "Satyam Pandey"
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "token-optimizer",
+  "version": "1.4.0",
+  "description": "Clarifies vague build prompts, adds pre/post compaction summaries and protects Claude Code context by gating oversized noisy file reads.",
+  "author": {
+    "name": "Satyam Pandey"
+  },
+  "homepage": "https://github.com/satyamamarpandey/ClaudeTokenSAP",
+  "repository": "https://github.com/satyamamarpandey/ClaudeTokenSAP.git",
+  "license": "MIT",
+  "keywords": [
+    "token",
+    "optimizer",
+    "context",
+    "compression",
+    "clarification",
+    "claude-code",
+    "hooks",
+    "productivity"
+  ]
+}
