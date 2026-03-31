@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "token-optimizer",
-      "source": "./plugins/ClaudeTokenSAP",
+      "source": ".",
       "description": "Clarifies vague build prompts, protects large noisy reads, summarizes source files, and keeps compact session memory.",
       "author": {
         "name": "Satyam Pandey"
