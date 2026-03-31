@@ -139,7 +139,7 @@ function detectStack(rootDir) {
     "MODEL SELECTION (for subagents):",
     "- Use Haiku for: file searches, simple transforms, mechanical tasks, formatting",
     "- Use Sonnet for: main coding, multi-step logic, code review",
-    "- Use Opus only for: complex architecture, deep reasoning, ambiguous requirements",
+    "- Use Opus only for: complex architecture, deep reasoning, ambiguous requirements, complex coding, or when Sonnet fails to produce good output after 2 attempts",
     "- Default to the cheapest model that can handle the task",
     "",
     "PARALLEL DISPATCH:",

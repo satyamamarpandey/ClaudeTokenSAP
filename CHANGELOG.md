@@ -22,7 +22,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added (inspired by [obra/superpowers](https://github.com/obra/superpowers))
 - **Verification Before Completion** (`hooks/verification_guard.js`). Stop hook that enforces evidence-based verification before claiming work is done. Checks if tests/builds were run, bugs were verified fixed, and files exist. Prevents wasted tokens from rework after false "done" claims.
 - **Systematic Debugging (4-phase)** in error loop guard. When error loops are detected, injects a structured 4-phase protocol: root cause investigation, pattern analysis, hypothesis testing, and targeted fix. After 5+ failures, warns about architectural problems and suggests rethinking the approach entirely.
-- **Model Selection Optimization** in session banner. Guides subagent usage: Haiku for mechanical tasks, Sonnet for coding, Opus for architecture. Reduces token costs by defaulting to cheapest capable model.
+- **Model Selection Optimization** in session banner. Guides subagent usage: Haiku for mechanical tasks, Sonnet for coding and writing, Opus for architecture. Reduces token costs by defaulting to cheapest capable model.
 - **Parallel Dispatch Rules** in session banner. Mandates parallel Agent calls for independent tasks with narrow scope and complete context.
 - **TDD Enforcement** in session banner. Enforces RED-GREEN-REFACTOR cycle: write tests first, implement to pass, then refactor.
 

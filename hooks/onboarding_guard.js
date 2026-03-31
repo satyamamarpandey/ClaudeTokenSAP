@@ -191,7 +191,7 @@ const ASK_RULES = [
     "  Database: [Q4 answer]",
     "  Constraints: [Q5 answer]",
     "  # AI strategy",
-    "  Use Haiku for simple tasks; Sonnet for main development.",
+    "  Use Haiku for simple tasks; Sonnet for main development; Opus only for complex architecture, complex coding, deep reasoning, or when Sonnet fails after 2 attempts.",
     "  Keep context low: Grep before Read, targeted reads only.",
     "  # Rules",
     "  Concise responses. No overengineering. No unrequested extras.",
