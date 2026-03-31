@@ -1,8 +1,32 @@
 const fs = require("fs");
 const path = require("path");
-const { appendDebugLog } = require("../lib/debug-log");
+const {
+  appendDebugLog,
+  mergeSessionState,
+} = require("../lib/debug-log");
 
 const MAX_ANALYZE_BYTES = 250 * 1024;
+
+const SOURCE_CODE_EXTENSIONS = new Set([
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".py",
+  ".kt",
+  ".swift",
+  ".java",
+  ".go",
+  ".rs",
+  ".rb",
+  ".php",
+  ".c",
+  ".cpp",
+  ".cs",
+  ".html",
+  ".css",
+  ".scss",
+]);
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -59,10 +83,7 @@ function summarizeLog(text, filePath) {
 
     repeated.set(line, (repeated.get(line) || 0) + 1);
 
-    if (
-      /ERROR|WARN|FATAL|EXCEPTION|TIMEOUT|FAILED|TRACEBACK|STACK/i.test(line) &&
-      highSignal.length < 8
-    ) {
+    if (/ERROR|WARN|FATAL|EXCEPTION|TIMEOUT|FAILED|TRACEBACK|STACK/i.test(line) && highSignal.length < 8) {
       highSignal.push(line);
     }
   }
@@ -79,7 +100,7 @@ function summarizeLog(text, filePath) {
     `- counts: ERROR=${counts.ERROR}, WARN=${counts.WARN}, INFO=${counts.INFO}, DEBUG=${counts.DEBUG}, FATAL=${counts.FATAL}`,
     topRepeated.length ? "- top repeated lines:\n" + topRepeated.join("\n") : "- top repeated lines: none",
     highSignal.length ? "- high-signal lines:\n" + highSignal.map((line) => `- ${line.slice(0, 180)}`).join("\n") : "- high-signal lines: none",
-    "- Reason over these patterns instead of the repeated low-signal lines. Request exact ranges only if needed."
+    "- Reason over these patterns instead of the repeated low-signal lines. Request exact ranges only if needed.",
   ].join("\n");
 }
 
@@ -90,10 +111,9 @@ function inferShape(value, depth = 0) {
     return `array<${inferShape(value[0], depth + 1)}>`;
   }
   if (value && typeof value === "object") {
-    const keys = Object.keys(value).slice(0, 8);
     return {
       type: "object",
-      keys,
+      keys: Object.keys(value).slice(0, 8),
     };
   }
   return typeof value;
@@ -107,14 +127,14 @@ function summarizeJson(text, filePath) {
         ? Object.keys(parsed).slice(0, 20)
         : [];
 
-    let details = [];
+    const details = [];
     if (Array.isArray(parsed)) {
       details.push(`- root type: array (${parsed.length} items in analyzed slice)`);
       if (parsed.length > 0) {
         details.push(`- sample item shape: ${JSON.stringify(inferShape(parsed[0]))}`);
       }
     } else if (parsed && typeof parsed === "object") {
-      details.push(`- root type: object`);
+      details.push("- root type: object");
       details.push(`- top-level keys: ${topKeys.join(", ") || "(none)"}`);
 
       for (const key of topKeys.slice(0, 8)) {
@@ -134,13 +154,13 @@ function summarizeJson(text, filePath) {
     return [
       `Token Optimizer summary for ${path.basename(filePath)}:`,
       ...details,
-      "- Prefer targeted key/section reads for exact values instead of re-reading the full JSON."
+      "- Prefer targeted key or section reads for exact values instead of re-reading the full JSON.",
     ].join("\n");
   } catch {
     return [
       `Token Optimizer summary for ${path.basename(filePath)}:`,
       "- JSON parse failed in analyzed slice.",
-      "- Treat this as structured text and read only the relevant ranges or keys."
+      "- Treat this as structured text and read only the relevant ranges or keys.",
     ].join("\n");
   }
 }
@@ -153,7 +173,71 @@ function summarizeCsv(text, filePath) {
     `Token Optimizer summary for ${path.basename(filePath)}:`,
     `- approx rows analyzed: ${Math.max(lines.length - 1, 0)}`,
     `- columns: ${columns.join(", ") || "(none detected)"}`,
-    "- Prefer focused column/sample inspection instead of loading the full table."
+    "- Prefer focused column or sample inspection instead of loading the full table.",
+  ].join("\n");
+}
+
+function detectGeneratedOrMinified(text) {
+  const newlineCount = (text.match(/\n/g) || []).length;
+  return text.length > 2000 && newlineCount <= 2;
+}
+
+function summarizeSourceCode(text, filePath, ext) {
+  const lines = text.split(/\r?\n/);
+  const imports = new Set();
+  const exportsFound = new Set();
+  const functions = new Set();
+  const classes = new Set();
+  const todos = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    if (ext === ".py") {
+      if (/^(from\s+\S+\s+import\s+.+|import\s+.+)$/.test(line)) imports.add(line);
+      const defMatch = line.match(/^def\s+([A-Za-z_][A-Za-z0-9_]*)/);
+      if (defMatch) functions.add(defMatch[1]);
+      const classMatch = line.match(/^class\s+([A-Za-z_][A-Za-z0-9_]*)/);
+      if (classMatch) classes.add(classMatch[1]);
+    } else if (ext === ".html") {
+      const tagMatch = line.match(/^<([a-zA-Z0-9-]+)/);
+      if (tagMatch) classes.add(`<${tagMatch[1]}>`);
+    } else if (ext === ".css" || ext === ".scss") {
+      if (/{\s*$/.test(line) && !line.startsWith("@")) functions.add(line.replace(/\s*{\s*$/, ""));
+    } else {
+      if (/^import\s+.+from\s+['"].+['"]/.test(line) || /^import\s+['"].+['"]/.test(line)) imports.add(line);
+      if (/^export\s+/.test(line)) exportsFound.add(line.slice(0, 120));
+      const fnMatch =
+        line.match(/^(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)/) ||
+        line.match(/^(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(/) ||
+        line.match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(/);
+      if (fnMatch) functions.add(fnMatch[1]);
+      const classMatch = line.match(/^class\s+([A-Za-z_$][A-Za-z0-9_$]*)/);
+      if (classMatch) classes.add(classMatch[1]);
+    }
+
+    if (/TODO|FIXME|HACK|BUG/i.test(line) && todos.length < 5) {
+      todos.push(line.slice(0, 180));
+    }
+  }
+
+  const generated = detectGeneratedOrMinified(text);
+  const importList = [...imports].slice(0, 6);
+  const exportList = [...exportsFound].slice(0, 6);
+  const functionList = [...functions].slice(0, 10);
+  const classList = [...classes].slice(0, 10);
+
+  return [
+    `Token Optimizer source summary for ${path.basename(filePath)}:`,
+    `- approx lines analyzed: ${lines.length}`,
+    generated ? "- looks generated or minified: yes" : "- looks generated or minified: no",
+    importList.length ? "- imports:\n" + importList.map((v) => `- ${v}`).join("\n") : "- imports: none detected",
+    exportList.length ? "- exports:\n" + exportList.map((v) => `- ${v}`).join("\n") : "- exports: none detected",
+    functionList.length ? "- functions or selectors:\n" + functionList.map((v) => `- ${v}`).join("\n") : "- functions or selectors: none detected",
+    classList.length ? "- classes or top-level tags:\n" + classList.map((v) => `- ${v}`).join("\n") : "- classes or top-level tags: none detected",
+    todos.length ? "- TODO or FIXME markers:\n" + todos.map((v) => `- ${v}`).join("\n") : "- TODO or FIXME markers: none detected",
+    "- Prefer targeted symbol or range reads if exact raw code is needed.",
   ].join("\n");
 }
 
@@ -163,7 +247,7 @@ function summarizeGeneric(text, filePath) {
     `Token Optimizer summary for ${path.basename(filePath)}:`,
     `- approx lines analyzed: ${lines.length}`,
     `- approx chars analyzed: ${text.length}`,
-    "- If this file is repetitive or generated, prefer focused reads over full dumps."
+    "- If this file is repetitive or generated, prefer focused reads over full dumps.",
   ].join("\n");
 }
 
@@ -194,13 +278,21 @@ function summarizeGeneric(text, filePath) {
   }
 
   let summary;
+  let summaryType;
   if ([".log", ".txt"].includes(ext)) {
+    summaryType = "log";
     summary = summarizeLog(text, filePath);
   } else if ([".json", ".jsonl", ".ndjson"].includes(ext)) {
+    summaryType = "json";
     summary = summarizeJson(text, filePath);
   } else if ([".csv", ".tsv"].includes(ext)) {
+    summaryType = "csv";
     summary = summarizeCsv(text, filePath);
+  } else if (SOURCE_CODE_EXTENSIONS.has(ext)) {
+    summaryType = "source";
+    summary = summarizeSourceCode(text, filePath, ext);
   } else {
+    summaryType = "generic";
     summary = summarizeGeneric(text, filePath);
   }
 
@@ -209,6 +301,24 @@ function summarizeGeneric(text, filePath) {
     ext,
     sizeBytes: stat.size,
     analyzedChars: text.length,
+    summaryType,
+  });
+
+  mergeSessionState((prev) => {
+    const existing = prev.recentlyReadFiles || [];
+    const nextRead = {
+      filePath,
+      ext,
+      sizeBytes: stat.size,
+      summaryType,
+      at: new Date().toISOString(),
+    };
+
+    return {
+      ...prev,
+      recentlyReadFiles: [nextRead, ...existing].slice(0, 8),
+      lastReadFile: nextRead,
+    };
   });
 
   process.stdout.write(

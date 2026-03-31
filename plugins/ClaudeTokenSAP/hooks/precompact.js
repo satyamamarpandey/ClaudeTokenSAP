@@ -1,11 +1,6 @@
+const { appendDebugLog, LOG_FILE, readSessionState } = require("../lib/debug-log");
 const fs = require("fs");
-const path = require("path");
-const { appendDebugLog } = require("../lib/debug-log");
 
-/**
- * Read a JSON payload from stdin. Claude Code passes arguments for hooks
- * using this mechanism. If parsing fails, return an empty object.
- */
 function readJsonStdin() {
   return new Promise((resolve) => {
     let raw = "";
@@ -23,21 +18,19 @@ function readJsonStdin() {
   });
 }
 
-// Produce a simple summary of the current debug log. This helps
-// compacting sessions understand what has occurred so far.
-function summarizeDebug(logFilePath) {
+function recentDebugEvents(limit = 5) {
   try {
-    const lines = fs.readFileSync(logFilePath, "utf8").trim().split(/\n+/);
-    // Only keep the last few events to avoid blowing up context
-    const recent = lines.slice(-5).map((line) => {
-      try {
-        const obj = JSON.parse(line);
-        return `${obj.event}: ${new Date(obj.ts).toLocaleString()} (pid ${obj.pid})`;
-      } catch {
-        return line;
-      }
-    });
-    return recent;
+    const lines = fs.readFileSync(LOG_FILE, "utf8").trim().split(/\n+/);
+    return lines
+      .slice(-limit)
+      .map((line) => {
+        try {
+          const item = JSON.parse(line);
+          return `${item.event} @ ${item.ts}`;
+        } catch {
+          return line;
+        }
+      });
   } catch {
     return [];
   }
@@ -45,30 +38,55 @@ function summarizeDebug(logFilePath) {
 
 (async () => {
   const payload = await readJsonStdin();
-  // Log the precompact event for telemetry
   appendDebugLog("precompact", {
     cwd: payload.cwd,
     model: payload.model,
   });
 
-  // Build an additional context message summarizing recent events
-  const logFile = process.env.TOKEN_OPTIMIZER_LOG_FILE || path.join(require("os").tmpdir(), "token-optimizer-debug.log");
-  const summaryLines = summarizeDebug(logFile);
-  const additionalContext = summaryLines.length
-    ? [
-        "Token Optimizer pre-compact summary:",
-        "Recent events:",
-        ...summaryLines,
-      ].join("\n")
-    : "";
+  const state = readSessionState();
+  const assumptions = state.assumptions || {};
+  const recentFiles = (state.recentlyReadFiles || []).slice(0, 5).map((item) => {
+    const base = item.filePath ? item.filePath.split(/[\\/]/).pop() : "unknown";
+    return `- ${base} (${item.summaryType || item.ext || "unknown"})`;
+  });
 
-  // Output the additional context if non-empty
-  const output = {};
-  if (additionalContext) {
-    output.hookSpecificOutput = {
-      hookEventName: "PreCompact",
-      additionalContext,
-    };
+  const assumptionLines = [];
+  if (assumptions.platform) assumptionLines.push(`- platform: ${assumptions.platform}`);
+  if (assumptions.framework) assumptionLines.push(`- framework: ${assumptions.framework}`);
+  if (assumptions.frameworkSelection) assumptionLines.push(`- framework selection: ${assumptions.frameworkSelection}`);
+  if (assumptions.featureScope) assumptionLines.push(`- feature scope: ${assumptions.featureScope}`);
+  if (Array.isArray(assumptions.ui) && assumptions.ui.length) assumptionLines.push(`- ui: ${assumptions.ui.join(", ")}`);
+  if (Array.isArray(assumptions.features) && assumptions.features.length) assumptionLines.push(`- features: ${assumptions.features.join(", ")}`);
+
+  const lines = [
+    "Token Optimizer pre-compact memory:",
+    `- current task: ${state.currentTask || "unknown"}`,
+    `- clarification rounds used: ${state.clarificationRounds || 0}`,
+    `- blocked large reads: ${state.blockedReads || 0}`,
+  ];
+
+  if (assumptionLines.length) {
+    lines.push("- active assumptions:");
+    lines.push(...assumptionLines);
   }
-  process.stdout.write(JSON.stringify(output));
+
+  if (recentFiles.length) {
+    lines.push("- recently read files:");
+    lines.push(...recentFiles);
+  }
+
+  const events = recentDebugEvents(4);
+  if (events.length) {
+    lines.push("- recent hook events:");
+    lines.push(...events.map((event) => `- ${event}`));
+  }
+
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreCompact",
+        additionalContext: lines.join("\n"),
+      },
+    })
+  );
 })();

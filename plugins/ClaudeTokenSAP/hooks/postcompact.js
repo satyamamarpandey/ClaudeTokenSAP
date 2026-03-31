@@ -1,6 +1,8 @@
-const fs = require("fs");
-const path = require("path");
-const { appendDebugLog } = require("../lib/debug-log");
+const {
+  appendDebugLog,
+  mergeSessionState,
+  readSessionState,
+} = require("../lib/debug-log");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -19,31 +21,51 @@ function readJsonStdin() {
   });
 }
 
-// Count total events in the debug log for telemetry after compaction.
-function countEvents(logFilePath) {
-  try {
-    const lines = fs.readFileSync(logFilePath, "utf8").trim().split(/\n+/);
-    return lines.length;
-  } catch {
-    return 0;
-  }
-}
-
 (async () => {
   const payload = await readJsonStdin();
-  // Log the postcompact event
+
   appendDebugLog("postcompact", {
     cwd: payload.cwd,
     model: payload.model,
   });
-  const logFile = process.env.TOKEN_OPTIMIZER_LOG_FILE || path.join(require("os").tmpdir(), "token-optimizer-debug.log");
-  const totalEvents = countEvents(logFile);
-  const additionalContext = `Token Optimizer post-compact summary:\nTotal events logged this session: ${totalEvents}`;
+
+  const nextState = mergeSessionState((prev) => ({
+    ...prev,
+    compactionCount: (prev.compactionCount || 0) + 1,
+    lastCompactedAt: new Date().toISOString(),
+  }));
+
+  const assumptions = nextState.assumptions || {};
+  const nextStepHints = [];
+  if (nextState.lastBlockedFile) {
+    nextStepHints.push(`Inspect ${nextState.lastBlockedFile.filePath.split(/[\\/]/).pop()} with a targeted search or range read.`);
+  }
+  if (nextState.lastReadFile) {
+    nextStepHints.push(`Continue from ${nextState.lastReadFile.filePath.split(/[\\/]/).pop()} if more exact detail is needed.`);
+  }
+  if (assumptions.frameworkSelection === "plugin-may-choose-default" && !assumptions.framework) {
+    nextStepHints.push("Pick a sensible framework default and continue instead of re-asking.");
+  }
+
+  const lines = [
+    "Token Optimizer post-compact summary:",
+    `- compaction count: ${nextState.compactionCount || 0}`,
+    `- current task: ${nextState.currentTask || "unknown"}`,
+  ];
+
+  if (assumptions.platform) lines.push(`- platform: ${assumptions.platform}`);
+  if (assumptions.framework) lines.push(`- framework: ${assumptions.framework}`);
+
+  if (nextStepHints.length) {
+    lines.push("- continuation hints:");
+    lines.push(...nextStepHints.map((line) => `- ${line}`));
+  }
+
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PostCompact",
-        additionalContext,
+        additionalContext: lines.join("\n"),
       },
     })
   );

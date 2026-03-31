@@ -4,13 +4,13 @@
     "name": "Satyam Pandey"
   },
   "metadata": {
-    "description": "Claude Code plugins focused on token optimization, context compression, and leaner development workflows."
+    "description": "Claude Code plugins for context optimization, clarification gating, compaction memory, and leaner development workflows."
   },
   "plugins": [
     {
       "name": "token-optimizer",
       "source": "./plugins/ClaudeTokenSAP",
-      "description": "Automatically compresses bulky JSON, logs, and noisy text before they consume Claude context.",
+      "description": "Clarifies vague build prompts, protects large noisy reads, summarizes source files, and keeps compact session memory.",
       "author": {
         "name": "Satyam Pandey"
       }

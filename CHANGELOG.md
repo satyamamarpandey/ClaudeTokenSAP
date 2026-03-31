@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.4.0] - 2026-03-30
+## [1.5.0] - 2026-03-30
 
 ### Added
 - **Plain text condensation** (`condenseProse`) - removes whitespace noise, HTML comments, horizontal rules, and excessive spacing from large user messages. Fires when ≥10% savings are achievable.

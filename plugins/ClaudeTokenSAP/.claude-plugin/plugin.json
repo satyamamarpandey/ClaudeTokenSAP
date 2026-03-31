@@ -1,7 +1,7 @@
 {
   "name": "token-optimizer",
-  "version": "1.4.0",
-  "description": "Clarifies vague build prompts, adds pre/post compaction summaries and protects Claude Code context by gating oversized noisy file reads.",
+  "version": "1.5.0",
+  "description": "Clarifies vague build prompts, carries forward compaction memory, summarizes source files, and protects Claude Code context by gating oversized noisy reads.",
   "author": {
     "name": "Satyam Pandey"
   },
@@ -14,6 +14,7 @@
     "context",
     "compression",
     "clarification",
+    "compaction",
     "claude-code",
     "hooks",
     "productivity"

@@ -1,9 +1,14 @@
 const fs = require("fs");
 const path = require("path");
-const { appendDebugLog } = require("../lib/debug-log");
+const {
+  appendDebugLog,
+  mergeSessionState,
+} = require("../lib/debug-log");
 
 const LARGE_FILE_BYTES = 120 * 1024;
 const VERY_LARGE_FILE_BYTES = 400 * 1024;
+const LARGE_SOURCE_FILE_BYTES = 300 * 1024;
+const LARGE_LOCK_FILE_BYTES = 60 * 1024;
 
 const NOISY_EXTENSIONS = new Set([
   ".json",
@@ -15,7 +20,41 @@ const NOISY_EXTENSIONS = new Set([
   ".ndjson",
   ".lock",
   ".map",
+  ".min.js",
+  ".min.css",
 ]);
+
+const SOURCE_CODE_EXTENSIONS = new Set([
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".py",
+  ".kt",
+  ".swift",
+  ".java",
+  ".go",
+  ".rs",
+  ".rb",
+  ".php",
+  ".c",
+  ".cpp",
+  ".cs",
+  ".html",
+  ".css",
+  ".scss",
+]);
+
+const NOISY_DIRS = [
+  "node_modules",
+  "dist",
+  "build",
+  ".next",
+  "coverage",
+  ".turbo",
+  "vendor",
+  "out",
+];
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -57,6 +96,9 @@ function hasTargetedRead(toolInput = {}) {
     "range",
     "from",
     "to",
+    "pattern",
+    "grep",
+    "query",
   ];
 
   return targetedKeys.some((key) => toolInput[key] !== undefined && toolInput[key] !== null);
@@ -77,19 +119,39 @@ function isLikelyMinified(filePath) {
   }
 }
 
-function buildGuidance(filePath, sizeBytes, ext) {
+function isInNoisyDir(filePath) {
+  const normalized = filePath.split(path.sep).map((part) => part.toLowerCase());
+  return NOISY_DIRS.some((dir) => normalized.includes(dir.toLowerCase()));
+}
+
+function isLockFile(filePath) {
+  const lower = path.basename(filePath).toLowerCase();
+  return [
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lockb",
+    "cargo.lock",
+  ].includes(lower);
+}
+
+function buildGuidance(filePath, sizeBytes, ext, mode = "noisy") {
   const kb = Math.round(sizeBytes / 1024);
-  // Normalize the extension into a human‑friendly label. Remove the leading dot when present.
   const label = ext ? ext.replace(/^\./, "") : "text";
 
-  let strategy = [
-    // Provide a clear, friendly first line. Use lower‑case file type names and avoid technical jargon.
-    `Token Optimizer blocked a full read on a large ${label} file (${kb} KB) to protect your Claude context.`,
+  const strategy = [
+    `Token Optimizer blocked a full read on a large ${label} file (${kb} KB) to protect your Claude context.`,
     "",
     "Use a narrower strategy instead:",
   ];
 
-  if (ext === ".json" || ext === ".jsonl" || ext === ".ndjson") {
+  if (mode === "source") {
+    strategy.push(
+      "1. Inspect imports, exports, functions, classes, or routes first.",
+      "2. Read only the symbol, range, or section you actually need.",
+      "3. Avoid dumping the whole file unless exact raw code is necessary."
+    );
+  } else if (ext === ".json" || ext === ".jsonl" || ext === ".ndjson") {
     strategy.push(
       "1. Inspect top-level structure first (keys, object shape, array sizes).",
       "2. Read only the relevant keys or sections.",
@@ -105,7 +167,7 @@ function buildGuidance(filePath, sizeBytes, ext) {
     strategy.push(
       "1. Inspect headers and row counts first.",
       "2. Read only sample rows or the relevant columns.",
-      "3. Summarize repeated/null-heavy patterns instead of loading everything."
+      "3. Summarize repeated or null-heavy patterns instead of loading everything."
     );
   } else {
     strategy.push(
@@ -115,11 +177,7 @@ function buildGuidance(filePath, sizeBytes, ext) {
     );
   }
 
-  strategy.push(
-    "",
-    `File: ${filePath}`
-  );
-
+  strategy.push("", `File: ${filePath}`);
   return strategy.join("\n");
 }
 
@@ -142,24 +200,49 @@ function buildGuidance(filePath, sizeBytes, ext) {
 
   const stat = fs.statSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
-  const noisyType = NOISY_EXTENSIONS.has(ext) || isLikelyMinified(filePath);
+  const noisyType = NOISY_EXTENSIONS.has(ext) || isLikelyMinified(filePath) || isInNoisyDir(filePath);
+  const sourceCodeType = SOURCE_CODE_EXTENSIONS.has(ext);
+  const lockFile = isLockFile(filePath);
 
-  const shouldBlock =
+  const shouldBlockNoisy =
+    (lockFile && stat.size >= LARGE_LOCK_FILE_BYTES) ||
     (noisyType && stat.size >= LARGE_FILE_BYTES) ||
     stat.size >= VERY_LARGE_FILE_BYTES;
+
+  const shouldBlockSource =
+    sourceCodeType &&
+    (stat.size >= LARGE_SOURCE_FILE_BYTES || isLikelyMinified(filePath) || isInNoisyDir(filePath));
+
+  const shouldBlock = shouldBlockNoisy || shouldBlockSource;
+  const mode = shouldBlockSource ? "source" : "noisy";
 
   appendDebugLog("read_guard_check", {
     filePath,
     ext,
     sizeBytes: stat.size,
     noisyType,
+    sourceCodeType,
+    lockFile,
     shouldBlock,
+    mode,
   });
 
   if (!shouldBlock) {
     process.exit(0);
   }
 
-  process.stderr.write(buildGuidance(filePath, stat.size, ext));
+  mergeSessionState((prev) => ({
+    ...prev,
+    blockedReads: (prev.blockedReads || 0) + 1,
+    lastBlockedFile: {
+      filePath,
+      ext,
+      sizeBytes: stat.size,
+      at: new Date().toISOString(),
+      mode,
+    },
+  }));
+
+  process.stderr.write(buildGuidance(filePath, stat.size, ext, mode));
   process.exit(2);
 })();

@@ -6,7 +6,7 @@
 
 <p>
   <a href="#installation"><img src="https://img.shields.io/badge/install-2%20commands-111827?style=for-the-badge" alt="Install in 2 commands"></a>
-  <a href="#whats-new-in-v140"><img src="https://img.shields.io/badge/version-v1.4.0-2563eb?style=for-the-badge" alt="Version 1.4.0"></a>
+  <a href="#whats-new-in-v140"><img src="https://img.shields.io/badge/version-v1.5.0-2563eb?style=for-the-badge" alt="Version 1.5.0"></a>
   <a href="#supported-platforms"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f766e?style=for-the-badge" alt="Windows macOS Linux"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2018-7c3aed?style=for-the-badge" alt="Node 18+"></a>
 </p>
@@ -60,9 +60,9 @@ That creates three practical problems:
 
 ---
 
-## What’s new in v1.4.0
+## What’s new in v1.5.0
 
-Version `1.4.0` adds the latest workflow upgrades:
+Version `1.5.0` adds the latest workflow upgrades:
 
 ### Clarification gate for vague build prompts
 If a user prompt is underspecified, the plugin pushes Claude to ask focused follow-up questions **before** writing code.
