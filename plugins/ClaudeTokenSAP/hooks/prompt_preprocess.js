@@ -1,7 +1,4 @@
-const {
-  appendDebugLog,
-  mergeSessionState,
-} = require("../lib/debug-log");
+const { appendDebugLog } = require("../lib/debug-log");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -24,97 +21,105 @@ function hasAny(text, patterns) {
   return patterns.some((pattern) => pattern.test(text));
 }
 
-function uniqueTrimmed(values) {
-  return [...new Set(values.filter(Boolean).map((v) => String(v).trim()).filter(Boolean))];
+function normalize(text) {
+  return (text || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function detectPlatform(text) {
-  if (/\breact native\b|\bflutter\b|\bcross[- ]platform\b/.test(text)) return "cross-platform mobile";
-  if (/\bmobile\b/.test(text)) return "mobile";
-  if (/\bandroid\b/.test(text)) return "android";
-  if (/\bios\b|\biphone\b|\bipad\b/.test(text)) return "ios";
-  if (/\bdesktop\b|\belectron\b/.test(text)) return "desktop";
-  if (/\bweb\b|\bwebsite\b|\bhtml\b|\bcss\b|\bjavascript\b|\breact\b|\bnext\b|\bvue\b/.test(text)) return "web";
-  if (/\bopencode\b/.test(text)) return "opencode";
-  return null;
-}
+function extractSignals(text) {
+  const buildVerb = hasAny(text, [
+    /\bcreate\b/,
+    /\bbuild\b/,
+    /\bmake\b/,
+    /\bgenerate\b/,
+    /\bscaffold\b/,
+    /\bstart\b/,
+    /\bimplement\b/,
+    /\bdevelop\b/,
+  ]);
 
-function detectFramework(text) {
-  if (/\bflutter\b/.test(text)) return "flutter";
-  if (/\breact native\b/.test(text)) return "react-native";
-  if (/\breact\b/.test(text)) return "react";
-  if (/\bvue\b/.test(text)) return "vue";
-  if (/\bnext\b/.test(text)) return "nextjs";
-  if (/\bswift\b/.test(text)) return "swift";
-  if (/\bkotlin\b/.test(text)) return "kotlin";
-  if (/\bvanilla\b/.test(text)) return "vanilla";
-  return null;
-}
+  const buildNoun = hasAny(text, [
+    /\bapp\b/,
+    /\bapplication\b/,
+    /\bwebsite\b/,
+    /\bsite\b/,
+    /\bdashboard\b/,
+    /\btool\b/,
+    /\bplugin\b/,
+    /\bextension\b/,
+    /\bbot\b/,
+    /\bagent\b/,
+    /\bcalculator\b/,
+  ]);
 
-function detectUi(text) {
-  const uiMatches = [];
-  if (/\bmodern\b/.test(text)) uiMatches.push("modern");
-  if (/\bminimal\b/.test(text)) uiMatches.push("minimal");
-  if (/\bclean\b/.test(text)) uiMatches.push("clean");
-  if (/\bdark\b/.test(text)) uiMatches.push("dark");
-  if (/\blight\b/.test(text)) uiMatches.push("light");
-  if (/\bios-like\b/.test(text)) uiMatches.push("ios-like");
-  if (/\bmaterial\b/.test(text)) uiMatches.push("material");
-  if (/\bopencode\b/.test(text)) uiMatches.push("opencode-like");
-  if (/\bpremium\b/.test(text)) uiMatches.push("premium");
-  return uniqueTrimmed(uiMatches);
-}
+  const buildIntent = buildVerb && buildNoun;
 
-function detectFeatures(text) {
-  const features = [];
-  if (/\bhistory\b/.test(text)) features.push("history");
-  if (/\bkeyboard\b/.test(text)) features.push("keyboard support");
-  if (/\boffline\b/.test(text)) features.push("offline");
-  if (/\btheme\b|\bthemes\b/.test(text)) features.push("themes");
-  if (/\bdecimal\b/.test(text)) features.push("decimal support");
-  if (/\bscientific\b/.test(text)) features.push("scientific");
-  if (/\bfinancial\b|\bfinance\b/.test(text)) features.push("financial");
-  if (/\bunit conversion\b|\bunit converter\b/.test(text)) features.push("unit conversion");
-  return uniqueTrimmed(features);
-}
+  const platformMentioned = hasAny(text, [
+    /\bweb\b/,
+    /\bwebsite\b/,
+    /\bhtml\b/,
+    /\bcss\b/,
+    /\bjavascript\b/,
+    /\btypescript\b/,
+    /\breact\b/,
+    /\bnext\b/,
+    /\bandroid\b/,
+    /\bios\b/,
+    /\bflutter\b/,
+    /\bkotlin\b/,
+    /\bswift\b/,
+    /\bdesktop\b/,
+    /\belectron\b/,
+    /\breact native\b/,
+    /\bcross-platform\b/,
+    /\bmobile\b/,
+    /\bopencode\b/,
+    /\bclaude code\b/,
+  ]);
 
-function summarizePrompt(prompt) {
-  const original = prompt || "";
-  const text = original.toLowerCase().trim();
+  const frameworkMentioned = hasAny(text, [
+    /\breact\b/,
+    /\breact native\b/,
+    /\bexpo\b/,
+    /\bflutter\b/,
+    /\bvue\b/,
+    /\bnext\b/,
+    /\bangular\b/,
+    /\bkotlin\b/,
+    /\bswift\b/,
+    /\belectron\b/,
+    /\bvanilla js\b/,
+  ]);
 
-  const buildIntent =
-    hasAny(text, [
-      /\bcreate\b/,
-      /\bbuild\b/,
-      /\bmake\b/,
-      /\bgenerate\b/,
-      /\bscaffold\b/,
-      /\bstart\b/,
-      /\bimplement\b/,
-      /\bdevelop\b/,
-    ]) &&
-    hasAny(text, [
-      /\bapp\b/,
-      /\bapplication\b/,
-      /\bwebsite\b/,
-      /\bsite\b/,
-      /\bdashboard\b/,
-      /\btool\b/,
-      /\bplugin\b/,
-      /\bextension\b/,
-      /\bbot\b/,
-      /\bagent\b/,
-      /\bcalculator\b/,
-    ]);
+  const uiMentioned = hasAny(text, [
+    /\bmodern\b/,
+    /\bsleek\b/,
+    /\bminimal\b/,
+    /\bclean\b/,
+    /\bdark\b/,
+    /\blight\b/,
+    /\bios-like\b/,
+    /\bmaterial\b/,
+    /\bpremium\b/,
+    /\bopencode-like\b/,
+  ]);
 
-  const platform = detectPlatform(text);
-  const framework = detectFramework(text);
-  const ui = detectUi(text);
-  const features = detectFeatures(text);
-
-  const platformMentioned = Boolean(platform);
-  const uiMentioned = ui.length > 0;
-  const featureMentioned = features.length > 0 || /\ball features\b|\ball functions\b/.test(text);
+  const featureMentioned = hasAny(text, [
+    /\bhistory\b/,
+    /\bkeyboard\b/,
+    /\boffline\b/,
+    /\bmemory\b/,
+    /\bscientific\b/,
+    /\bunit conversion\b/,
+    /\btheme\b/,
+    /\bthemes\b/,
+    /\bdark mode\b/,
+    /\ball features\b/,
+    /\ball functions\b/,
+    /\badvanced math\b/,
+  ]);
 
   const simplestRequested = hasAny(text, [
     /\bsimple\b/,
@@ -124,155 +129,117 @@ function summarizePrompt(prompt) {
     /\bminimal\b/,
   ]);
 
-  const chooseDefaultsPermission = hasAny(text, [
+  const explicitProceedPermission = hasAny(text, [
     /\bchoose your own framework\b/,
-    /\buse the best one\b/,
+    /\bchoose your own\b/,
     /\bbest one\b/,
-    /\byour choice\b/,
-    /\byour own framework\b/,
-  ]);
-
-  const allFeaturesRequested = hasAny(text, [
+    /\bpick for me\b/,
+    /\byou choose\b/,
+    /\bchoose for me\b/,
     /\ball features\b/,
     /\ball functions\b/,
-    /\beverything\b/,
   ]);
 
-  const commaSegments = original
-    .split(/[,;\n]/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  const looksLikeOptionAnswer =
-    original.length <= 220 &&
-    (commaSegments.length >= 2 ||
+  const looksLikeOptionSelection =
+    text.length > 0 &&
+    text.length < 220 &&
+    (text.includes(",") ||
       hasAny(text, [
         /\bweb\b/,
-        /\bmobile\b/,
         /\bdesktop\b/,
-        /\bandroid\b/,
-        /\bios\b/,
-        /\breact\b/,
-        /\bflutter\b/,
-        /\bvanilla\b/,
+        /\bmobile\b/,
+        /\bcustom\b/,
         /\bmodern\b/,
+        /\bminimal\b/,
         /\bdark\b/,
         /\bhistory\b/,
+        /\bkeyboard\b/,
+        /\bscientific\b/,
+        /\bfinancial\b/,
       ]));
 
-  const clarificationAnswer =
+  const isClarificationAnswer =
     !buildIntent &&
-    (looksLikeOptionAnswer || chooseDefaultsPermission || allFeaturesRequested);
-
-  const providedSignalCount = [
-    platformMentioned,
-    Boolean(framework),
-    uiMentioned,
-    featureMentioned,
-    simplestRequested,
-    chooseDefaultsPermission,
-    allFeaturesRequested,
-  ].filter(Boolean).length;
-
-  const ambiguityScore =
-    (platformMentioned ? 0 : 2) +
-    (framework || chooseDefaultsPermission ? 0 : 1) +
-    (uiMentioned ? 0 : 1) +
-    (featureMentioned || allFeaturesRequested ? 0 : 1);
-
-  const shouldUseSmartDefaults =
-    clarificationAnswer &&
-    (chooseDefaultsPermission || allFeaturesRequested || providedSignalCount >= 2);
+    (looksLikeOptionSelection || explicitProceedPermission);
 
   return {
-    promptLength: original.length,
+    promptLength: text.length,
     buildIntent,
     platformMentioned,
-    platform,
-    framework,
+    frameworkMentioned,
     uiMentioned,
-    ui,
     featureMentioned,
-    features,
     simplestRequested,
-    chooseDefaultsPermission,
-    allFeaturesRequested,
-    clarificationAnswer,
-    providedSignalCount,
+    explicitProceedPermission,
+    looksLikeOptionSelection,
+    isClarificationAnswer,
+  };
+}
+
+function computeAmbiguityScore(signals) {
+  if (!signals.buildIntent && !signals.isClarificationAnswer) {
+    return 0;
+  }
+
+  let score = 0;
+
+  if (!signals.platformMentioned) score += 1;
+  if (!signals.uiMentioned) score += 1;
+  if (!signals.featureMentioned && !signals.simplestRequested) score += 1;
+
+  return score;
+}
+
+function decideMode(signals) {
+  const ambiguityScore = computeAmbiguityScore(signals);
+
+  let mode = "pass";
+
+  if (signals.buildIntent) {
+    if (
+      signals.platformMentioned &&
+      (signals.featureMentioned || signals.simplestRequested)
+    ) {
+      mode = "proceed";
+    } else if (ambiguityScore >= 2) {
+      mode = "clarify";
+    } else {
+      mode = "proceed";
+    }
+  }
+
+  if (signals.isClarificationAnswer) {
+    mode = "proceed_with_defaults";
+  }
+
+  if (signals.explicitProceedPermission) {
+    mode = "proceed_with_defaults";
+  }
+
+  return {
+    mode,
     ambiguityScore,
-    shouldUseSmartDefaults,
-    promptExcerpt: original.slice(0, 240),
+    shouldUseSmartDefaults:
+      signals.isClarificationAnswer || signals.explicitProceedPermission,
   };
 }
 
 (async () => {
   const payload = await readJsonStdin();
-  const prompt = payload.prompt || payload.user_prompt || "";
-  const summary = summarizePrompt(prompt);
+  const prompt = payload.prompt || "";
+  const normalized = normalize(prompt);
+
+  const signals = extractSignals(normalized);
+  const decision = decideMode(signals);
 
   appendDebugLog("prompt_preprocess", {
-    ...summary,
     cwd: payload.cwd,
+    rawPromptLength: prompt.length,
+    ...signals,
+    ...decision,
   });
 
-  mergeSessionState((prev) => {
-    const priorAssumptions = prev.assumptions || {};
-    const nextAssumptions = {
-      ...priorAssumptions,
-      ...(summary.platform ? { platform: summary.platform } : {}),
-      ...(summary.framework ? { framework: summary.framework } : {}),
-      ...(summary.ui.length ? { ui: summary.ui } : {}),
-      ...(summary.features.length ? { features: summary.features } : {}),
-      ...(summary.chooseDefaultsPermission ? { frameworkSelection: "plugin-may-choose-default" } : {}),
-      ...(summary.allFeaturesRequested ? { featureScope: "broad" } : {}),
-    };
-
-    return {
-      ...prev,
-      cwd: payload.cwd || prev.cwd,
-      currentTask:
-        summary.buildIntent || summary.clarificationAnswer
-          ? prompt.slice(0, 240)
-          : prev.currentTask,
-      lastPromptAnalysis: {
-        ...summary,
-        at: new Date().toISOString(),
-      },
-      assumptions: nextAssumptions,
-      clarificationRounds:
-        summary.clarificationAnswer
-          ? Math.max(prev.clarificationRounds || 0, 1)
-          : prev.clarificationRounds || 0,
-    };
-  });
-
-  let additionalContext = "";
-  if (summary.clarificationAnswer && summary.shouldUseSmartDefaults) {
-    additionalContext = [
-      "Signal from Token Optimizer:",
-      "- The current user message looks like an answer to an earlier clarification round.",
-      "- Do not ask a second full clarification round.",
-      "- Proceed with smart defaults for any remaining minor gaps.",
-      "- Treat phrases like 'choose your own framework' or 'best one' as permission to pick a sensible default.",
-      "- Treat phrases like 'all features' or 'all functions' as permission to include a broad first version.",
-    ].join("\n");
-  } else if (summary.buildIntent) {
-    additionalContext = [
-      "Signal from Token Optimizer:",
-      "- This looks like a fresh build request.",
-      "- Ask at most one clarification round and only for missing categories.",
-      "- If the user later replies with short options or comma-separated choices, treat that as a clarification answer and continue with defaults.",
-    ].join("\n");
-  }
-
-  if (additionalContext) {
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "UserPromptSubmit",
-          additionalContext,
-        },
-      })
-    );
-  }
+  // This hook stays deterministic and low-cost on purpose.
+  // It does not block directly. It only records richer telemetry so the
+  // UserPromptSubmit model hook can stay simple and robust.
 })();
