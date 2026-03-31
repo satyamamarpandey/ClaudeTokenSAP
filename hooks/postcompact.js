@@ -115,10 +115,7 @@ function readJsonStdin() {
 
   process.stdout.write(
     JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "PostCompact",
-        additionalContext: lines.join("\n"),
-      },
+      systemMessage: lines.join("\n"),
     })
   );
 })();

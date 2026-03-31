@@ -124,10 +124,7 @@ function recentDebugEvents(limit = 5) {
 
   process.stdout.write(
     JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "PreCompact",
-        additionalContext: lines.join("\n"),
-      },
+      systemMessage: lines.join("\n"),
     })
   );
 })();

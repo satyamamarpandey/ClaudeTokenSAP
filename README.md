@@ -6,7 +6,7 @@
 
 <p>
   <a href="#installation"><img src="https://img.shields.io/badge/install-2%20commands-111827?style=for-the-badge" alt="Install in 2 commands"></a>
-  <a href="#whats-new-in-v220"><img src="https://img.shields.io/badge/version-v2.2.0-2563eb?style=for-the-badge" alt="Version 2.2.0"></a>
+  <a href="#whats-new-in-v221"><img src="https://img.shields.io/badge/version-v2.2.1-2563eb?style=for-the-badge" alt="Version 2.2.1"></a>
   <a href="#supported-platforms"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f766e?style=for-the-badge" alt="Windows macOS Linux"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2018-7c3aed?style=for-the-badge" alt="Node 18+"></a>
 </p>
@@ -60,9 +60,9 @@ That creates three practical problems:
 
 ---
 
-## What’s new in v2.2.0
+## What’s new in v2.2.1
 
-Version `2.2.0` adds token budget intelligence, error loop prevention, search compression, and duplicate read tracking:
+Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features — token budget intelligence, error loop prevention, search compression, and duplicate read tracking:
 
 ### Token budget tracking
 Estimates token consumption across all operations (reads, prompts, bash, search). Progressive warnings at 60% and 80% capacity. Strategic compaction triggers at 70% budget instead of naive prompt counting.

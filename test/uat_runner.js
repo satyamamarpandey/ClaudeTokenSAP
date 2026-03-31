@@ -1,5 +1,5 @@
 /**
- * Token Optimizer v2.2.0 — Comprehensive UAT Runner
+ * Token Optimizer v2.2.1 — Comprehensive UAT Runner
  * Tests all hooks across multiple project types and measures token savings.
  */
 const { execSync } = require("child_process");
@@ -209,7 +209,7 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 
     if (!result.output) throw new Error("No output from SessionStart hook");
     const ctx = result.output.hookSpecificOutput.additionalContext;
-    if (!ctx.includes("TOKEN OPTIMIZER v2.2.0")) throw new Error("Missing version header");
+    if (!ctx.includes("TOKEN OPTIMIZER v2.2.1")) throw new Error("Missing version header");
     if (!ctx.includes("MANDATORY RULES")) throw new Error("Missing mandatory rules");
     if (!ctx.includes("SEARCH FIRST")) throw new Error("Missing SEARCH FIRST section");
     if (!ctx.includes("CONCISE OUTPUT")) throw new Error("Missing CONCISE OUTPUT section");
@@ -506,7 +506,7 @@ test("PreCompact: preserves session state", () => {
   const result = runHook("precompact.js", { cwd: dir });
 
   if (!result.output) throw new Error("No output from precompact");
-  const ctx = result.output.hookSpecificOutput.additionalContext;
+  const ctx = result.output.systemMessage;
   if (!ctx.includes("pre-compact memory")) throw new Error("Missing memory header");
   if (!ctx.includes("prompts this session")) throw new Error("Missing prompt count");
 
@@ -518,7 +518,7 @@ test("PostCompact: increments compaction count + provides metrics", () => {
   const result = runHook("postcompact.js", { cwd: TEMP_ROOT });
 
   if (!result.output) throw new Error("No output from postcompact");
-  const ctx = result.output.hookSpecificOutput.additionalContext;
+  const ctx = result.output.systemMessage;
   if (!ctx.toLowerCase().includes("post-compact")) throw new Error("Missing post-compact header");
   if (!ctx.includes("compaction #")) throw new Error("Missing compaction count");
   if (!ctx.includes("Update .claude/CLAUDE.md")) throw new Error("Missing CLAUDE.md update reminder");
@@ -725,7 +725,7 @@ test("Read guard: blocks binary file extensions", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.2.0 — UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.2.1 — UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));

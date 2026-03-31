@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.2.1] - 2026-03-31
+
+### Fixed
+- **PreCompact/PostCompact hook schema validation**. Replaced invalid `hookSpecificOutput` with `hookEventName: "PreCompact"/"PostCompact"` (not recognized by Claude Code) with valid `systemMessage` field. Hooks now pass schema validation and inject context correctly during compaction.
+
+---
+
 ## [2.2.0] - 2026-03-31
 
 ### Added
