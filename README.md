@@ -6,6 +6,7 @@
 
 <p>
   <a href="#installation"><img src="https://img.shields.io/badge/install-2%20commands-111827?style=for-the-badge" alt="Install in 2 commands"></a>
+  <a href="#why-teams-use-it"><img src="https://img.shields.io/badge/token%20focus-context%20efficiency-16a34a?style=for-the-badge" alt="Context efficiency"></a>
   <a href="#whats-new-in-v221"><img src="https://img.shields.io/badge/version-v2.2.1-2563eb?style=for-the-badge" alt="Version 2.2.1"></a>
   <a href="#supported-platforms"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f766e?style=for-the-badge" alt="Windows macOS Linux"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2018-7c3aed?style=for-the-badge" alt="Node 18+"></a>
@@ -38,6 +39,35 @@ The core idea is simple:
 
 ---
 
+## Why teams use it
+
+### Context efficiency comparison
+
+| Workflow | What usually happens | Token impact |
+|---|---|---|
+| Vague build prompt | Claude starts coding too early, then backtracks | High waste |
+| Token Optimizer enabled | Claude asks focused clarifying questions first | Lower waste |
+| Large noisy log read | Raw bulk floods context | Very high waste |
+| Token Optimizer enabled | Full read is blocked and narrowed | 50–80% lower in repetitive cases |
+| Large JSON read | Full structure gets dumped into session | High waste |
+| Token Optimizer enabled | Shape, keys, counts, and summaries are used first | 40–75% lower in good-fit cases |
+| Long coding session | Context drifts after compaction | Hidden waste |
+| Token Optimizer enabled | Lightweight continuity is preserved | Better session quality |
+
+### Approximate token-saving ranges
+
+| Input type | Typical optimization | Approximate reduction |
+|---|---|---|
+| Repetitive logs | Collapse noise, surface real failures | 60–85% |
+| Large JSON | Shape/key summary instead of full bulk | 40–75% |
+| Repeated file reads | Prevent duplicate noisy context | 20–50% |
+| Vague build starts | Clarify before scaffolding | Often large downstream savings |
+| Search-heavy sessions | Compress broad match output | 60–80% |
+
+> In highly repetitive cases, reductions can exceed **70%**, but savings vary by workflow, file type, prompt quality, and session behavior.
+
+---
+
 ## Why this exists
 
 Claude Code is strongest when context contains **signal**, not bulk.
@@ -54,7 +84,7 @@ That creates three practical problems:
 
 1. **Higher token usage**
 2. **Lower reasoning quality**
-3. **More time wasted clarifying basic build direction after code has already started**
+3. **More time wasted clarifying build direction after code has already started**
 
 **Token Optimizer** is designed to intervene at exactly those points.
 
@@ -62,36 +92,36 @@ That creates three practical problems:
 
 ## What’s new in v2.2.1
 
-Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features - token budget intelligence, error loop prevention, search compression, and duplicate read tracking:
+Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features — token budget intelligence, error loop prevention, search compression, and duplicate read tracking.
 
 ### Token budget tracking
 Estimates token consumption across all operations (reads, prompts, bash, search). Progressive warnings at 60% and 80% capacity. Strategic compaction triggers at 70% budget instead of naive prompt counting.
 
 ### Error loop detection
-PostToolUse hook on Bash monitors repeated error patterns. Normalizes errors (strips timestamps, paths, numbers) and intervenes after 3 identical failures with actionable guidance to break the loop.
+PostToolUse hook on Bash monitors repeated error patterns. Normalizes errors by stripping timestamps, paths, and numbers, then intervenes after 3 identical failures with actionable guidance to break the loop.
 
 ### Search result compression
-Grep results with 40+ matches are grouped by file with match counts. Glob results are grouped by directory. Reduces search output by 60-80% while preserving the most relevant matches.
+Grep results with 40+ matches are grouped by file with match counts. Glob results are grouped by directory. This reduces search output by 60–80% while preserving the most relevant matches.
 
 ### Duplicate read prevention
 Tracks every file read per session. Warns when a file has been read 3+ times. Integrates with the read guard to reduce redundant context consumption.
 
 ### Binary file blocking
-Instantly blocks reads on binary files (.png, .jpg, .exe, .zip, .mp4, .pdf, .woff2, etc.) - they waste tokens and aren’t useful as text.
+Instantly blocks reads on binary files (`.png`, `.jpg`, `.exe`, `.zip`, `.mp4`, `.pdf`, `.woff2`, etc.). They waste tokens and are not useful as text.
 
 ### Structured post-compact briefing
 After compaction, injects a structured resume briefing with token budget status, efficiency metrics from all subsystems, architecture change summary, and file modification categories.
 
-### Previous (v2.1.0) improvements:
+### Previous (v2.1.0) improvements
 
 - Smart prompt analysis with auto-detected defaults and contextual onboarding hints
 - Write/edit tracking categorizes every file modification
-- Follow-up gap detection on prompts 2-4
+- Follow-up gap detection on prompts 2–4
 - Enriched compaction memory with architecture signals
 
-### Previous (v2.0.2) improvements:
+### Previous (v2.0.2) improvements
 
-### Clarification gate for vague build prompts
+#### Clarification gate for vague build prompts
 If a user prompt is underspecified, the plugin pushes Claude to ask focused follow-up questions **before** writing code.
 
 The questions are:
@@ -102,7 +132,7 @@ The questions are:
 - capped at 4 questions
 - always include **Custom** as the last option
 
-### Read guard for large noisy files
+#### Read guard for large noisy files
 Large full-file reads for noisy files such as `.log`, `.json`, `.csv`, `.txt`, `.jsonl`, `.ndjson`, `.lock`, and `.map` are blocked when they would likely waste context.
 
 Instead of dumping the whole file, Claude is guided toward narrower strategies such as:
@@ -111,7 +141,7 @@ Instead of dumping the whole file, Claude is guided toward narrower strategies s
 - inspecting structure first
 - focusing on errors, keys, columns, or repeated patterns
 
-### Post-read summaries
+#### Post-read summaries
 After a useful `Read`, the plugin adds compact summaries for:
 
 - logs
@@ -119,7 +149,7 @@ After a useful `Read`, the plugin adds compact summaries for:
 - CSV / TSV
 - generic text files
 
-### PreCompact and PostCompact hooks
+#### PreCompact and PostCompact hooks
 The plugin now keeps a lightweight memory layer around Claude Code compaction.
 
 This helps long sessions preserve useful recent state such as:
@@ -128,10 +158,10 @@ This helps long sessions preserve useful recent state such as:
 - recent file-read summaries
 - high-signal debug activity
 
-### Repo summary at session start
-At session start, the plugin adds a short repo-level file-type summary so Claude gets a quick sense of project shape without scanning the whole workspace.
+#### Repo summary at session start
+At session start, Claude gets a short repo-level file-type summary so it gets project shape without scanning the whole workspace.
 
-### Debug logging and telemetry foundation
+#### Debug logging and telemetry foundation
 Hook activity is written to a local temp log so you can validate behavior and measure the impact of optimizations over time.
 
 ---
@@ -352,6 +382,12 @@ claude plugin marketplace add https://github.com/satyamamarpandey/ClaudeTokenSAP
 ```bash
 claude plugin install token-optimizer@claudetokensap-marketplace
 ```
+
+### Need even more optimization?
+
+For deeper session optimization, advanced context shaping, and stronger plugin configuration patterns, see:
+
+**https://docs.anthropic.com/en/docs/claude-code/overview**
 
 ### 3. Restart Claude Code
 
