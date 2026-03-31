@@ -71,99 +71,51 @@ const ASK_RULES = [
 
   const projectName = path.basename(cwd) || "Project";
 
-  // Create .claude/ directory
-  try { fs.mkdirSync(claudeDir, { recursive: true }); } catch {}
+  // NOTE: We do NOT create files here. Files are created by Claude after
+  // the user answers onboarding questions. This prevents leftover placeholder
+  // files when the API connection fails (FailedToOpenSocket, etc).
+  // Session state (onboardingDone = true) prevents re-triggering within session.
 
-  // Create a minimal placeholder CLAUDE.md so the hook won't re-trigger
-  // Claude will update this with real answers after asking questions
-  const placeholderMd = [
-    `# ${projectName}`,
+  appendDebugLog("onboarding_triggered", { cwd, projectName });
+
+  // Build file contents that Claude will create after Q&A
+  const settingsContent = JSON.stringify({
+    permissions: {
+      deny: DENY_RULES,
+      ask: ASK_RULES,
+    },
+  }, null, 2);
+
+  const claudeignoreContent = [
+    "# Token Optimizer - auto-generated .claudeignore",
+    "# Blocks noisy directories and files from Claude Code indexing",
     "",
-    "<!-- Token Optimizer: onboarding in progress - Claude will update this file -->",
+    "node_modules/",
+    "dist/",
+    "build/",
+    ".next/",
+    "coverage/",
+    ".turbo/",
+    "vendor/",
+    "out/",
+    ".git/",
+    ".cache/",
+    ".parcel-cache/",
+    "__pycache__/",
+    "target/",
     "",
-    "## Project Info",
-    "- Type: (pending onboarding)",
-    "- Platform: (pending onboarding)",
-    "- Language: (pending onboarding)",
-    "- Target Users: (pending onboarding)",
-    "- Database: (pending onboarding)",
-    "",
-    "## AI Strategy",
-    "- Use Haiku for simple tasks, Sonnet for main development",
-    "- Keep context low: Grep before Read, targeted reads only",
-    "- Concise responses, no overengineering, no unrequested extras",
-    "",
+    "# Large/binary files",
+    "*.lock",
+    "*.log",
+    "*.map",
+    "*.min.js",
+    "*.min.css",
+    "*.wasm",
+    "*.pb",
+    "*.tsbuildinfo",
+    "*.pyc",
+    "*.class",
   ].join("\n");
-
-  const created = [];
-
-  try {
-    fs.writeFileSync(claudeMdPath, placeholderMd, "utf8");
-    created.push(".claude/CLAUDE.md");
-  } catch (e) {
-    appendDebugLog("onboarding_error", { file: "CLAUDE.md", error: e.message });
-  }
-
-  // Write settings.json with deny + ask rules
-  if (!fs.existsSync(settingsPath)) {
-    try {
-      fs.writeFileSync(
-        settingsPath,
-        JSON.stringify({
-          permissions: {
-            deny: DENY_RULES,
-            ask: ASK_RULES,
-          },
-        }, null, 2),
-        "utf8"
-      );
-      created.push(".claude/settings.json");
-    } catch (e) {
-      appendDebugLog("onboarding_error", { file: "settings.json", error: e.message });
-    }
-  }
-
-  // Create .claudeignore for file-discovery-level blocking
-  const claudeIgnorePath = path.join(cwd, ".claudeignore");
-  if (!fs.existsSync(claudeIgnorePath)) {
-    try {
-      fs.writeFileSync(claudeIgnorePath, [
-        "# Token Optimizer - auto-generated .claudeignore",
-        "# Blocks noisy directories and files from Claude Code indexing",
-        "",
-        "node_modules/",
-        "dist/",
-        "build/",
-        ".next/",
-        "coverage/",
-        ".turbo/",
-        "vendor/",
-        "out/",
-        ".git/",
-        ".cache/",
-        ".parcel-cache/",
-        "__pycache__/",
-        "target/",
-        "",
-        "# Large/binary files",
-        "*.lock",
-        "*.log",
-        "*.map",
-        "*.min.js",
-        "*.min.css",
-        "*.wasm",
-        "*.pb",
-        "*.tsbuildinfo",
-        "*.pyc",
-        "*.class",
-      ].join("\n"), "utf8");
-      created.push(".claudeignore");
-    } catch (e) {
-      appendDebugLog("onboarding_error", { file: ".claudeignore", error: e.message });
-    }
-  }
-
-  appendDebugLog("onboarding_done", { cwd, projectName, created });
 
   // ── Smart prompt analysis ──
   const savedPrompt = prompt.slice(0, 500);
@@ -228,17 +180,36 @@ const ASK_RULES = [
     `   ${hints.constraints}`,
     "```",
     "",
-    "AFTER the user answers all 5 questions:",
-    "- Use the Edit tool to update `.claude/CLAUDE.md` - replace every '(pending onboarding)' with real answers",
-    "- Add detected domain/platform info if confirmed",
-    "- Keep CLAUDE.md under 20 lines, high-signal only",
-    "- THEN execute the original request: \"" + savedPrompt.slice(0, 200) + "\"",
+    "AFTER the user answers all 5 questions, CREATE these files:",
     "",
-    "⚠️ DO NOT write code, create files, or start building until you have ALL 5 answers.",
+    "Step 1: Create `.claude/` directory (Bash: mkdir -p .claude)",
+    "Step 2: Write `.claude/CLAUDE.md` with user answers (keep under 20 lines):",
+    "  # ProjectName",
+    "  Building: [Q1 answer]",
+    "  Stack: [Q2 answer]",
+    "  Users: [Q3 answer]",
+    "  Database: [Q4 answer]",
+    "  Constraints: [Q5 answer]",
+    "  # AI strategy",
+    "  Use Haiku for simple tasks; Sonnet for main development.",
+    "  Keep context low: Grep before Read, targeted reads only.",
+    "  # Rules",
+    "  Concise responses. No overengineering. No unrequested extras.",
+    "",
+    "Step 3: Write `.claude/settings.json` with this content:",
+    "  " + settingsContent.split("\n").slice(0, 3).join(" ") + " ...",
+    "",
+    "Step 4: Write `.claudeignore` in project ROOT (NOT .claudeignore.md):",
+    "  Standard ignore patterns for node_modules, dist, build, .next, etc.",
+    "",
+    "- THEN announce to the user: 'Setup complete. Now building: [original request]'",
+    "- THEN execute the original request: \"" + savedPrompt.slice(0, 200) + "\"",
+    "- When the build is DONE, announce: 'Done. [1-line summary of what was created]. Ready to test.' Then STOP.",
+    "",
+    "⚠️ DO NOT write code or start building until you have ALL 5 answers AND created the files.",
     "⚠️ DO NOT say \"Let me help you build...\" - just ask the 5 questions immediately.",
     "⚠️ If user answers briefly (e.g., 'yes' or '1. web, 2. react, ...'), accept defaults and proceed.",
-    "",
-    "Files auto-created: " + created.join(", "),
+    "⚠️ ALWAYS produce visible output the user can read. Never go silent.",
   );
 
   const directiveStr = directive.join("\n");

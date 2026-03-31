@@ -241,6 +241,7 @@ function tryCompressLogInPrompt(prompt) {
   // ── 4. Response optimization (on EVERY prompt) ──
   contextLines.push(
     "RESPONSE RULES (apply to this response):",
+    "- ALWAYS produce visible text output the user can see - never go silent",
     "- Be concise: max 3-5 sentences for explanations, no filler",
     "- No re-stating what the user said",
     "- No echoing file contents back unless asked",
@@ -248,9 +249,12 @@ function tryCompressLogInPrompt(prompt) {
     "- Omit 'Here is...' / 'I will...' / 'Let me...' preambles",
     "- If creating files: just create them, don't explain each line",
     "- Batch independent tool calls in parallel",
+    "- When the requested task is COMPLETE: say 'Done.' + one-line summary of what was created/changed. Then STOP. Do not continue with unrelated tasks.",
   );
 
   // ── 5. Follow-up detection (prompts 2-4): check CLAUDE.md completeness ──
+  // NOTE: Non-blocking - just notes gaps, does NOT tell Claude to stop and ask.
+  // This prevents the flow from stalling after onboarding answers.
   if (promptCount >= 2 && promptCount <= 4) {
     const cwd = payload.cwd || process.cwd();
     const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
@@ -262,9 +266,7 @@ function tryCompressLogInPrompt(prompt) {
         if (pendingFields.length > 0) {
           contextLines.push(
             "",
-            `[Token Optimizer: CLAUDE.md still has placeholder values for: ${pendingFields.join(", ")}.`,
-            "Before executing this prompt, ask the user to confirm these fields.",
-            "Format: \"I still need to know your [field] - [contextual hint]. Then I'll continue with your request.\"]"
+            `[Token Optimizer: CLAUDE.md has incomplete fields: ${pendingFields.join(", ")}. Fill these in when convenient, but do NOT block the user's current request.]`
           );
           appendDebugLog("followup_gaps", { gaps: pendingFields, promptCount });
         }
@@ -301,17 +303,16 @@ function tryCompressLogInPrompt(prompt) {
   if (compactCheck.should) {
     contextLines.push(
       "",
-      `[Token Optimizer: compaction recommended (${compactCheck.reason}). Run /compact now to free context. Tell the user: "Running /compact to optimize context."]`
+      `[Token Optimizer: context getting large (${compactCheck.reason}). After completing the current task, suggest /compact to the user.]`
     );
     appendDebugLog("compact_reminder", { promptCount, reason: compactCheck.reason });
   }
 
-  // ── 7. CLAUDE.md update reminder (every 3 prompts) ──
-  if (promptCount > 1 && promptCount % 3 === 0) {
+  // ── 7. CLAUDE.md update reminder (every 5 prompts - low frequency to avoid looping) ──
+  if (promptCount > 1 && promptCount % 5 === 0) {
     contextLines.push(
       "",
-      "[Token Optimizer: Check if you learned any new project facts this cycle (new dependency, pattern, decision).",
-      "If yes, append 1-2 lines to .claude/CLAUDE.md. If no new facts, skip. Keep CLAUDE.md under 30 lines.]"
+      "[Token Optimizer: If you learned new project facts (dependency, pattern, decision), append 1-2 lines to .claude/CLAUDE.md. Otherwise skip.]"
     );
   }
 

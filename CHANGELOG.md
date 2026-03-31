@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.3.1] - 2026-03-31
+
+### Fixed
+- **Flow: Claude no longer goes silent after onboarding.** Added "ALWAYS produce visible output" directive to response rules, session banner, and onboarding. Claude now always shows visible text the user can read without pressing Ctrl+O.
+- **Flow: Claude announces completion instead of looping.** Added explicit "Done. [summary]. Ready to test." completion signal to verification guard, response rules, and onboarding directive. Claude stops after announcing, no more incubating/precipitating loops.
+- **Flow: follow-up gap detection is non-blocking.** Previously, prompts 2-4 told Claude to "ask the user to confirm fields BEFORE executing" — this stalled the flow. Now it's a non-blocking note: "fill these in when convenient, do NOT block the current request."
+- **Flow: CLAUDE.md update reminder reduced.** Changed from every 3 prompts to every 5 to reduce directive noise that contributed to looping.
+- **Flow: compact reminder made non-blocking.** Changed from "Run /compact NOW" to "After completing the current task, suggest /compact" — no longer interrupts active work.
+- **Session banner: added FLOW CONTROL section.** Explicit rules for post-onboarding announcement, task completion, no re-verification loops, and always-visible output.
+
+---
+
+## [2.3.0] - 2026-03-31
+
+### Added (inspired by [obra/superpowers](https://github.com/obra/superpowers))
+- **Verification Before Completion** (`hooks/verification_guard.js`). Stop hook that enforces evidence-based verification before claiming work is done. Checks if tests/builds were run, bugs were verified fixed, and files exist. Prevents wasted tokens from rework after false "done" claims.
+- **Systematic Debugging (4-phase)** in error loop guard. When error loops are detected, injects a structured 4-phase protocol: root cause investigation, pattern analysis, hypothesis testing, and targeted fix. After 5+ failures, warns about architectural problems and suggests rethinking the approach entirely.
+- **Model Selection Optimization** in session banner. Guides subagent usage: Haiku for mechanical tasks, Sonnet for coding, Opus for architecture. Reduces token costs by defaulting to cheapest capable model.
+- **Parallel Dispatch Rules** in session banner. Mandates parallel Agent calls for independent tasks with narrow scope and complete context.
+- **TDD Enforcement** in session banner. Enforces RED-GREEN-REFACTOR cycle: write tests first, implement to pass, then refactor.
+
+### Fixed
+- **Onboarding no longer creates files eagerly.** Previously, `onboarding_guard.js` created `.claude/CLAUDE.md`, `.claude/settings.json`, and `.claudeignore` immediately during hook execution. If the API connection failed (e.g., FailedToOpenSocket), users were left with placeholder files. Now file creation is deferred to Claude's response after Q&A - if the API fails, no leftover files are created.
+- **`.claudeignore` filename clarified** in onboarding directive. Explicitly instructs Claude to create `.claudeignore` (not `.claudeignore.md`).
+
+---
+
 ## [2.2.1] - 2026-03-31
 
 ### Fixed

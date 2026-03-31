@@ -7,7 +7,7 @@
 <p>
   <a href="#installation"><img src="https://img.shields.io/badge/install-2%20commands-111827?style=for-the-badge" alt="Install in 2 commands"></a>
   <a href="#why-teams-use-it"><img src="https://img.shields.io/badge/token%20focus-context%20efficiency-16a34a?style=for-the-badge" alt="Context efficiency"></a>
-  <a href="#whats-new-in-v221"><img src="https://img.shields.io/badge/version-v2.2.1-2563eb?style=for-the-badge" alt="Version 2.2.1"></a>
+  <a href="#whats-new-in-v231"><img src="https://img.shields.io/badge/version-v2.3.1-2563eb?style=for-the-badge" alt="Version 2.3.1"></a>
   <a href="#supported-platforms"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f766e?style=for-the-badge" alt="Windows macOS Linux"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2018-7c3aed?style=for-the-badge" alt="Node 18+"></a>
 </p>
@@ -90,9 +90,23 @@ That creates three practical problems:
 
 ---
 
-## What’s new in v2.2.1
+## What’s new in v2.3.1
 
-Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features - token budget intelligence, error loop prevention, search compression, and duplicate read tracking.
+Version `2.3.1` fixes the flow issues where Claude goes silent after onboarding, loops indefinitely instead of announcing completion, and requires Ctrl+O to see responses.
+
+### Flow control fixes
+- **Visible output mandate**: All hooks now inject "ALWAYS produce visible text output" — Claude never goes silent.
+- **Completion signal**: Verification guard, response rules, and onboarding all instruct Claude to say "Done. [summary]. Ready to test." then STOP.
+- **Non-blocking follow-ups**: Follow-up gap detection (prompts 2-4) no longer blocks the user’s request. Changed from "ask before executing" to "fill in when convenient."
+- **Reduced directive noise**: CLAUDE.md reminders changed from every 3 prompts to every 5. Compact reminder deferred to after current task. Session banner has explicit FLOW CONTROL section.
+
+### Previous (v2.3.0) additions
+- **Verification Before Completion** — Stop hook enforces evidence-based verification.
+- **Systematic Debugging (4-phase)** — Error loop guard injects root cause → pattern → hypothesis → fix protocol.
+- **Model Selection, Parallel Dispatch, TDD** — Session banner rules for cost optimization and quality.
+- **Deferred onboarding file creation** — No leftover files on API failure.
+
+### Previous (v2.2.x) improvements
 
 ### Token budget tracking
 Estimates token consumption across all operations (reads, prompts, bash, search). Progressive warnings at 60% and 80% capacity. Strategic compaction triggers at 70% budget instead of naive prompt counting.

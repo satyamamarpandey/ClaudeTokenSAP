@@ -111,26 +111,61 @@ function checkErrorLoop(signature) {
     process.exit(0);
   }
 
-  // Loop detected! Inject intervention
+  // Loop detected! Inject systematic debugging intervention (inspired by superpowers)
+  const isArchitectural = loopCheck.count >= 5;
+
   const intervention = [
     `[TOKEN OPTIMIZER: ERROR LOOP DETECTED - same error seen ${loopCheck.count} times]`,
     "",
     `Error pattern: ${loopCheck.signature}`,
     "",
-    "STOP retrying the same approach. Instead:",
-    "1. Re-read the error message carefully - what is it actually saying?",
-    "2. Check your assumptions - is the file/module/dependency correct?",
-    "3. Try a fundamentally different approach (different API, different tool, different path)",
-    "4. If stuck, ask the user for clarification rather than looping",
+    "STOP. Follow SYSTEMATIC DEBUGGING (4 phases):",
     "",
-    "Do NOT run the same command again without a meaningful change.",
-  ].join("\n");
+    "Phase 1 - ROOT CAUSE (do this FIRST, no fixes yet):",
+    "- Read the FULL error message - what is it actually saying?",
+    "- Trace data flow backward to where it breaks",
+    "- Check recent changes that could have caused this",
+    "",
+    "Phase 2 - PATTERN ANALYSIS:",
+    "- Find similar WORKING code in the codebase (Grep for it)",
+    "- Compare: what's different between working and broken?",
+    "- Check all dependencies and imports",
+    "",
+    "Phase 3 - HYPOTHESIS:",
+    "- Form ONE clear hypothesis about the root cause",
+    "- Make the SMALLEST possible test change to verify",
+    "- If it doesn't work, revise the hypothesis - don't retry",
+    "",
+    "Phase 4 - FIX:",
+    "- Write a test that reproduces the failure FIRST",
+    "- Implement ONE targeted fix for the root cause",
+    "- Verify the test passes",
+  ];
+
+  if (isArchitectural) {
+    intervention.push(
+      "",
+      "⚠️ 5+ ATTEMPTS: ARCHITECTURAL PROBLEM LIKELY ⚠️",
+      "Each fix reveals new issues = wrong approach entirely.",
+      "STOP fixing symptoms. Ask the user:",
+      "- Is the overall design/approach correct?",
+      "- Should we try a fundamentally different architecture?",
+      "- Is there a simpler way to achieve this goal?",
+    );
+  }
+
+  intervention.push(
+    "",
+    "Do NOT run the same command again without completing Phase 1-3 first.",
+  );
+
+  const interventionStr = intervention.join("\n");
 
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
-        additionalContext: intervention,
+        additionalContext: interventionStr,
       },
     })
   );

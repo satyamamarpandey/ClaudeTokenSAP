@@ -1,5 +1,5 @@
 /**
- * Token Optimizer v2.2.1 - Comprehensive UAT Runner
+ * Token Optimizer v2.3.0 - Comprehensive UAT Runner
  * Tests all hooks across multiple project types and measures token savings.
  */
 const { execSync } = require("child_process");
@@ -209,7 +209,7 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 
     if (!result.output) throw new Error("No output from SessionStart hook");
     const ctx = result.output.hookSpecificOutput.additionalContext;
-    if (!ctx.includes("TOKEN OPTIMIZER v2.2.1")) throw new Error("Missing version header");
+    if (!ctx.includes("TOKEN OPTIMIZER v2.3.1")) throw new Error("Missing version header");
     if (!ctx.includes("MANDATORY RULES")) throw new Error("Missing mandatory rules");
     if (!ctx.includes("SEARCH FIRST")) throw new Error("Missing SEARCH FIRST section");
     if (!ctx.includes("CONCISE OUTPUT")) throw new Error("Missing CONCISE OUTPUT section");
@@ -236,23 +236,17 @@ test("Onboarding: triggers on fresh project (no CLAUDE.md)", () => {
   if (!ctx.includes("Language and framework")) throw new Error("Missing question 2 (language)");
   if (!ctx.includes("todo app")) throw new Error("Missing original prompt passthrough");
 
-  // Verify it created .claude/CLAUDE.md
-  if (!fs.existsSync(path.join(dir, ".claude", "CLAUDE.md"))) throw new Error("CLAUDE.md not created");
-  if (!fs.existsSync(path.join(dir, ".claude", "settings.json"))) throw new Error("settings.json not created");
-  if (!fs.existsSync(path.join(dir, ".claudeignore"))) throw new Error(".claudeignore not created");
+  // Files should NOT be created by the hook (deferred to Claude after Q&A)
+  if (fs.existsSync(path.join(dir, ".claude", "CLAUDE.md"))) throw new Error("CLAUDE.md should NOT be created by hook (deferred to Claude)");
+  if (fs.existsSync(path.join(dir, ".claude", "settings.json"))) throw new Error("settings.json should NOT be created by hook (deferred to Claude)");
 
-  // Verify .claudeignore has key patterns
-  const ignoreContent = fs.readFileSync(path.join(dir, ".claudeignore"), "utf8");
-  if (!ignoreContent.includes("node_modules/")) throw new Error(".claudeignore missing node_modules/");
-  if (!ignoreContent.includes("dist/")) throw new Error(".claudeignore missing dist/");
-
-  // Verify settings.json has deny + ask rules
-  const settings = JSON.parse(fs.readFileSync(path.join(dir, ".claude", "settings.json"), "utf8"));
-  if (!settings.permissions?.deny?.length) throw new Error("No deny rules in settings.json");
-  if (!settings.permissions?.ask?.length) throw new Error("No ask rules in settings.json");
+  // Directive should instruct Claude to create files after Q&A
+  if (!ctx.includes("AFTER the user answers all 5 questions")) throw new Error("Missing file creation instructions");
+  if (!ctx.includes(".claudeignore")) throw new Error("Missing .claudeignore creation instruction");
+  if (!ctx.includes("NOT .claudeignore.md")) throw new Error("Missing .claudeignore filename clarification");
 
   cleanup(dir);
-  return { detail: `Onboarding triggered, CLAUDE.md + settings.json + .claudeignore created, ${settings.permissions.deny.length} deny + ${settings.permissions.ask.length} ask rules` };
+  return { detail: "Onboarding triggered, file creation deferred to Claude (no eager writes)" };
 });
 
 test("Onboarding: skips when CLAUDE.md already exists", () => {
@@ -550,29 +544,33 @@ test("PromptPreprocess: auto-compact reminder at prompt #4", () => {
 // TEST SUITE 10: Settings.json deny/ask coverage
 // ═══════════════════════════════════════════════════════════════════════
 
-test("Onboarding settings.json: deny rules cover all noisy patterns", () => {
+test("Onboarding settings.json: directive includes deny/ask rules for Claude to create", () => {
   // Reset session state so onboardingDone doesn't block this test
-  const { writeSessionState, SESSION_STATE_FILE } = require("../lib/debug-log");
+  const { writeSessionState } = require("../lib/debug-log");
   try { writeSessionState({}); } catch {}
 
   const dir = createProjectDir("settings-check", { "index.js": "hello" });
-  runHook("onboarding_guard.js", { cwd: dir, prompt: "test" });
+  const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "test" });
 
-  const settings = JSON.parse(fs.readFileSync(path.join(dir, ".claude", "settings.json"), "utf8"));
-  const deny = settings.permissions.deny;
-  const ask = settings.permissions.ask;
+  if (!result.output) throw new Error("No output from onboarding hook");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
 
+  // Directive should mention settings.json creation with deny/ask rules
+  if (!ctx.includes("settings.json")) throw new Error("Missing settings.json creation instruction");
+
+  // Verify the deny/ask rules are defined in the hook source (they're passed in the directive)
+  const hookSrc = fs.readFileSync(path.join(HOOKS_DIR, "onboarding_guard.js"), "utf8");
   const requiredDeny = ["node_modules", "dist", "build", ".next", "coverage", ".lock", ".log", ".map", ".min.js", ".git"];
   const requiredAsk = [".png", ".jpg", ".mp4", ".svg"];
 
-  const missingDeny = requiredDeny.filter((pat) => !deny.some((d) => d.includes(pat)));
-  const missingAsk = requiredAsk.filter((pat) => !ask.some((a) => a.includes(pat)));
+  const missingDeny = requiredDeny.filter((pat) => !hookSrc.includes(pat));
+  const missingAsk = requiredAsk.filter((pat) => !hookSrc.includes(pat));
 
-  if (missingDeny.length) throw new Error(`Missing deny: ${missingDeny.join(", ")}`);
-  if (missingAsk.length) throw new Error(`Missing ask: ${missingAsk.join(", ")}`);
+  if (missingDeny.length) throw new Error(`Missing deny patterns in hook: ${missingDeny.join(", ")}`);
+  if (missingAsk.length) throw new Error(`Missing ask patterns in hook: ${missingAsk.join(", ")}`);
 
   cleanup(dir);
-  return { detail: `${deny.length} deny rules, ${ask.length} ask rules - all required patterns covered` };
+  return { detail: "All required deny/ask patterns present in onboarding hook directive" };
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -696,7 +694,147 @@ test("Error loop guard: detects repeated errors after 3 occurrences", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 15: Binary file blocking
+// TEST SUITE 15: Verification Before Completion (Stop hook)
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Verification guard: fires when work was done this session", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({ totalWrites: 5, promptCount: 4 }); } catch {}
+
+  const result = runHook("verification_guard.js", {});
+
+  if (!result.output) throw new Error("Expected verification output when work was done");
+  const ctx = result.output.systemMessage;
+  if (!ctx.includes("VERIFICATION BEFORE COMPLETION")) throw new Error("Missing verification header");
+  if (!ctx.includes("Evidence before claims")) throw new Error("Missing evidence directive");
+  if (!ctx.includes("run the relevant test")) throw new Error("Missing test verification step");
+
+  return { detail: "Verification guard fires with evidence-based checks" };
+});
+
+test("Verification guard: silent when no work was done", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({ totalWrites: 0, promptCount: 1 }); } catch {}
+
+  const result = runHook("verification_guard.js", {});
+
+  if (result.output) throw new Error("Should not fire when no work was done");
+  return { detail: "Correctly silent on idle sessions" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 16: Enhanced Error Loop - Systematic Debugging
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Error loop guard: includes systematic debugging phases", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const errorOutput = "TypeError: Cannot read properties of undefined (reading 'map')";
+
+  // Trigger 3 times to hit loop
+  for (let i = 0; i < 2; i++) {
+    runHook("error_loop_guard.js", {
+      tool_name: "Bash",
+      tool_response: { output: errorOutput, exit_code: 1 },
+      tool_input: { command: "node app.js" },
+    });
+  }
+
+  const result = runHook("error_loop_guard.js", {
+    tool_name: "Bash",
+    tool_response: { output: errorOutput, exit_code: 1 },
+    tool_input: { command: "node app.js" },
+  });
+
+  if (!result.output) throw new Error("Expected systematic debugging intervention");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("SYSTEMATIC DEBUGGING")) throw new Error("Missing systematic debugging header");
+  if (!ctx.includes("Phase 1")) throw new Error("Missing Phase 1 (root cause)");
+  if (!ctx.includes("Phase 2")) throw new Error("Missing Phase 2 (pattern analysis)");
+  if (!ctx.includes("Phase 3")) throw new Error("Missing Phase 3 (hypothesis)");
+  if (!ctx.includes("Phase 4")) throw new Error("Missing Phase 4 (fix)");
+
+  return { detail: "Systematic 4-phase debugging injected on error loop" };
+});
+
+test("Error loop guard: architectural warning after 5+ attempts", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const errorOutput = "FATAL: connection refused to localhost:5432";
+
+  // Trigger 5 times
+  for (let i = 0; i < 4; i++) {
+    runHook("error_loop_guard.js", {
+      tool_name: "Bash",
+      tool_response: { output: errorOutput, exit_code: 1 },
+      tool_input: { command: "psql -h localhost" },
+    });
+  }
+
+  const result = runHook("error_loop_guard.js", {
+    tool_name: "Bash",
+    tool_response: { output: errorOutput, exit_code: 1 },
+    tool_input: { command: "psql -h localhost" },
+  });
+
+  if (!result.output) throw new Error("Expected architectural warning");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("ARCHITECTURAL PROBLEM")) throw new Error("Missing architectural problem warning");
+  if (!ctx.includes("wrong approach")) throw new Error("Missing approach rethink suggestion");
+
+  return { detail: "Architectural rethink triggered after 5+ failures" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 17: Session Banner - Superpowers-inspired rules
+// ═══════════════════════════════════════════════════════════════════════
+
+test("SessionStart: includes verification, debugging, TDD, and model selection rules", () => {
+  const dir = createProjectDir("banner-rules", { "package.json": "{}" });
+  const result = runHook("instructions_loaded.js", { cwd: dir, source: "startup", model: "sonnet" });
+
+  if (!result.output) throw new Error("No output from SessionStart");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("VERIFICATION BEFORE COMPLETION")) throw new Error("Missing verification rules");
+  if (!ctx.includes("SYSTEMATIC DEBUGGING")) throw new Error("Missing systematic debugging rules");
+  if (!ctx.includes("TEST-DRIVEN DEVELOPMENT")) throw new Error("Missing TDD rules");
+  if (!ctx.includes("MODEL SELECTION")) throw new Error("Missing model selection rules");
+  if (!ctx.includes("PARALLEL DISPATCH")) throw new Error("Missing parallel dispatch rules");
+  if (!ctx.includes("Haiku")) throw new Error("Missing Haiku model guidance");
+  if (!ctx.includes("Sonnet")) throw new Error("Missing Sonnet model guidance");
+
+  cleanup(dir);
+  return { detail: "All superpowers-inspired rules present in session banner" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 18: Onboarding deferred file creation
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Onboarding: does NOT create files eagerly (API failure safe)", () => {
+  const dir = createProjectDir("onboard-no-eager", { "index.js": "console.log('hi');" });
+  runHook("onboarding_guard.js", { cwd: dir, prompt: "create a calculator" });
+
+  // No files should exist - all deferred to Claude
+  const claudeMdExists = fs.existsSync(path.join(dir, ".claude", "CLAUDE.md"));
+  const settingsExists = fs.existsSync(path.join(dir, ".claude", "settings.json"));
+  const claudeignoreExists = fs.existsSync(path.join(dir, ".claudeignore"));
+  const claudeignoreMdExists = fs.existsSync(path.join(dir, "claudeignore.md"));
+
+  if (claudeMdExists) throw new Error("CLAUDE.md should NOT be created by hook");
+  if (settingsExists) throw new Error("settings.json should NOT be created by hook");
+  if (claudeignoreMdExists) throw new Error("claudeignore.md should NEVER be created (wrong filename)");
+  // .claudeignore also should not be created by hook anymore
+  if (claudeignoreExists) throw new Error(".claudeignore should NOT be created by hook");
+
+  cleanup(dir);
+  return { detail: "No files created by hook - safe for API failures" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 19: Binary file blocking
 // ═══════════════════════════════════════════════════════════════════════
 
 test("Read guard: blocks binary file extensions", () => {
@@ -718,6 +856,134 @@ test("Read guard: blocks binary file extensions", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 20: Flow control - completion signals
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Flow: response rules include completion signal directive", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const result = runHook("prompt_preprocess.js", { cwd: TEMP_ROOT, prompt: "add a button" });
+
+  if (!result.output) throw new Error("No output");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("COMPLETE")) throw new Error("Missing completion signal directive");
+  if (!ctx.includes("Done.")) throw new Error("Missing 'Done.' announcement instruction");
+  if (!ctx.includes("STOP")) throw new Error("Missing STOP after completion");
+
+  return { detail: "Completion signal directive present in response rules" };
+});
+
+test("Flow: response rules include visible output directive", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const result = runHook("prompt_preprocess.js", { cwd: TEMP_ROOT, prompt: "fix the bug" });
+
+  if (!result.output) throw new Error("No output");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("visible") || !ctx.includes("output")) throw new Error("Missing visible output directive");
+  if (!ctx.includes("never go silent")) throw new Error("Missing anti-silence directive");
+
+  return { detail: "Visible output and anti-silence directives present" };
+});
+
+test("Flow: follow-up gaps are non-blocking (do not demand questions)", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({ promptCount: 1 }); } catch {}
+
+  const dir = createProjectDir("flow-nonblocking", {
+    ".claude/CLAUDE.md": "# Project\nBuilding: (pending onboarding)\nStack: (pending onboarding)",
+  });
+  const result = runHook("prompt_preprocess.js", { cwd: dir, prompt: "add user auth" });
+
+  if (!result.output) throw new Error("No output");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+
+  // Should NOT contain blocking language
+  if (ctx.includes("Before executing this prompt")) throw new Error("Follow-up gaps should NOT block the current prompt");
+  if (ctx.includes("I still need to know")) throw new Error("Follow-up should not demand questions");
+
+  // Should contain non-blocking note
+  if (ctx.includes("incomplete fields")) {
+    if (!ctx.includes("do NOT block")) throw new Error("Missing non-blocking qualifier");
+  }
+
+  cleanup(dir);
+  return { detail: "Follow-up gaps are non-blocking - do not stall the flow" };
+});
+
+test("Flow: verification guard includes completion announcement", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({ totalWrites: 3, promptCount: 5 }); } catch {}
+
+  const result = runHook("verification_guard.js", {});
+
+  if (!result.output) throw new Error("Expected verification output");
+  const ctx = result.output.systemMessage;
+  if (!ctx.includes("ANNOUNCE COMPLETION")) throw new Error("Missing completion announcement section");
+  if (!ctx.includes("Done.")) throw new Error("Missing 'Done.' template");
+  if (!ctx.includes("Ready to test")) throw new Error("Missing 'Ready to test' signal");
+  if (!ctx.includes("STOP")) throw new Error("Missing STOP directive after completion");
+
+  return { detail: "Verification guard includes completion announcement and STOP signal" };
+});
+
+test("Flow: session banner includes flow control rules", () => {
+  const dir = createProjectDir("flow-banner", { "package.json": "{}" });
+  const result = runHook("instructions_loaded.js", { cwd: dir, source: "startup", model: "sonnet" });
+
+  if (!result.output) throw new Error("No output from SessionStart");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("FLOW CONTROL")) throw new Error("Missing FLOW CONTROL section");
+  if (!ctx.includes("Setup complete")) throw new Error("Missing post-onboarding flow instruction");
+  if (!ctx.includes("STOP")) throw new Error("Missing STOP after completion instruction");
+  if (!ctx.includes("never go silent") && !ctx.includes("Never stay silent")) throw new Error("Missing anti-silence rule");
+  if (!ctx.includes("visible output")) throw new Error("Missing visible output mandate");
+
+  cleanup(dir);
+  return { detail: "Session banner has flow control rules for completion and visibility" };
+});
+
+test("Flow: onboarding includes completion + visibility directives", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const dir = createProjectDir("flow-onboard", { "index.js": "hello" });
+  const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "build a todo app" });
+
+  if (!result.output) throw new Error("No output");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("Setup complete")) throw new Error("Missing post-onboarding flow announcement");
+  if (!ctx.includes("Done.")) throw new Error("Missing build completion signal");
+  if (!ctx.includes("Ready to test")) throw new Error("Missing ready-to-test signal");
+  if (!ctx.includes("visible output")) throw new Error("Missing visible output directive");
+
+  cleanup(dir);
+  return { detail: "Onboarding directive includes full flow: setup → build → announce done" };
+});
+
+test("Flow: CLAUDE.md reminder frequency reduced (every 5, not 3)", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  // Run 3 prompts - should NOT get CLAUDE.md reminder at prompt 3
+  for (let i = 0; i < 2; i++) {
+    runHook("prompt_preprocess.js", { cwd: TEMP_ROOT, prompt: `prompt ${i + 1}` });
+  }
+  const result3 = runHook("prompt_preprocess.js", { cwd: TEMP_ROOT, prompt: "prompt 3" });
+  const ctx3 = result3.output?.hookSpecificOutput?.additionalContext || "";
+  if (ctx3.includes("project facts") || ctx3.includes("CLAUDE.md")) {
+    // Allow it if it's from follow-up detection (which is different from the reminder)
+    if (ctx3.includes("append 1-2 lines")) {
+      throw new Error("CLAUDE.md update reminder should NOT fire at prompt 3 (changed to every 5)");
+    }
+  }
+
+  return { detail: "CLAUDE.md reminder frequency reduced to every 5 prompts" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // REPORT
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -725,7 +991,7 @@ test("Read guard: blocks binary file extensions", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.2.1 - UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.3.1 - UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));
@@ -759,6 +1025,7 @@ const features = {
   "Response Rules": { desc: "Conciseness rules on every prompt", impact: "~20-40% shorter responses" },
   "Deny/Ask Rules": { desc: "16 deny + 8 ask patterns in settings.json", impact: "Blocks bulk reads at permission level" },
   "Pre/Post Compact": { desc: "Session state survives compaction", impact: "Continuity across context resets" },
+  "Flow Control": { desc: "Completion signals, visible output, non-blocking follow-ups", impact: "No more silent loops or stuck states" },
 };
 
 console.log("  FEATURE BREAKDOWN:");
