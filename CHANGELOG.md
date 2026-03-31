@@ -5,41 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.0.1] - 2026-03-31
+## [2.0.2] - 2026-03-31
 
 ### Fixed
-- **Onboarding questions now enforced.** Rewrote the onboarding directive with consequence-framing ("entire session wasted if you guess wrong") so Claude cannot skip questions and jump straight to building. Previously, `additionalContext` was too weak and Claude would ignore it when the user's prompt was directly actionable (e.g., "Create a Calculator" → built a web app without asking if they wanted mobile).
-- **`.claudeignore` auto-created on first run.** The onboarding guard now creates a `.claudeignore` file alongside `CLAUDE.md` and `settings.json`, blocking noisy directories (`node_modules/`, `dist/`, `build/`, `.next/`, etc.) at the file-discovery level — complementing the settings.json deny rules which only block tool actions.
+- **Onboarding questions now enforced.** Rewrote the onboarding directive with consequence-framing so Claude cannot skip questions and jump straight to building.
+- **`.claudeignore` auto-created on first run.** Blocks noisy directories at file-discovery level alongside `settings.json` deny rules.
+- **Version string updated everywhere.** plugin.json, session banner, UAT runner, and README all reflect current version.
 
 ### Added
-- **CLAUDE.md as living source of truth.** SessionStart policy now instructs Claude to always read `.claude/CLAUDE.md` before starting any task and use it for stack/platform/user info instead of rescanning the codebase.
-- **Continuous CLAUDE.md improvement.** Prompt preprocessor reminds Claude every 3 prompts to check if new project facts were learned and append them to CLAUDE.md (max 30 lines).
-- **Pending onboarding detection.** If CLAUDE.md still has `(pending onboarding)` placeholders, Claude is instructed to ask the user to fill them in before proceeding.
-
----
-
-## [2.0.1] - 2026-03-31
-
-### Added
-- **Interactive onboarding questions.** First-run setup now asks the user 5 questions (app type, language/framework, target users, database needs, constraints) before proceeding. Answers are written into `.claude/CLAUDE.md` via the Edit tool. No more auto-inference.
-- **Prompt counting and auto-compact.** Session state tracks prompt count. Every 4 prompts, a `/compact` reminder is injected automatically to keep context lean.
-- **Response optimization directives.** Every prompt now injects concise-output rules: no preambles, no echoing, no filler, code-only when appropriate, parallel tool calls enforced.
-- **JSON→CSV conversion.** Flat JSON arrays in user prompts are detected and the hook advises Claude to treat them as CSV for token savings.
-- **Nested JSON summarization.** Large nested JSON in prompts gets a schema+sample summary directive instead of full parsing.
-- **Log output detection.** Large log/command output in prompts triggers head+tail+errors summary guidance.
-- **Progressive CLAUDE.md updates.** Pre-compact and post-compact hooks now instruct Claude to update `.claude/CLAUDE.md` with any new project information learned during the session.
-- **Stack auto-detection.** SessionStart hook detects project stack from manifest files (package.json, Cargo.toml, go.mod, etc.) and injects it into context.
-- **Ask rules for media files.** Settings.json now includes ask-before-read rules for images, videos, and audio files instead of flat deny.
-- **Session efficiency metrics.** Post-compact summary shows total savings actions (blocked reads, compressed outputs, compactions).
+- **CLAUDE.md as living source of truth.** SessionStart policy instructs Claude to read `.claude/CLAUDE.md` before any task and use it instead of rescanning the codebase.
+- **Continuous CLAUDE.md improvement.** Prompt preprocessor reminds Claude every 3 prompts to append new project facts to CLAUDE.md.
+- **Pending onboarding detection.** If CLAUDE.md has `(pending onboarding)` placeholders, Claude asks the user to fill them in first.
+- **Interactive onboarding questions.** First-run setup asks 5 questions (app type, language/framework, target users, database, constraints) before proceeding.
+- **Prompt counting and auto-compact.** Every 4 prompts, a `/compact` reminder is injected automatically.
+- **Response optimization directives.** Concise-output rules injected on every prompt.
+- **JSON→CSV conversion.** Flat JSON arrays detected and CSV treatment advised.
+- **Nested JSON summarization.** Large nested JSON gets schema+sample summary directive.
+- **Log output detection.** Large log output triggers head+tail+errors summary guidance.
+- **Progressive CLAUDE.md updates.** Pre/post-compact hooks instruct Claude to update CLAUDE.md with new project info.
+- **Stack auto-detection.** Detects project stack from manifest files and injects into context.
+- **Ask rules for media files.** Ask-before-read rules for images, videos, audio instead of flat deny.
+- **Session efficiency metrics.** Post-compact summary shows total savings actions.
 - **Expanded deny rules.** Added `.git/**`, `*.min.css`, `*.wasm`, `*.pb` to default deny list.
 
 ### Changed
-- **Onboarding guard rewritten.** Creates a placeholder CLAUDE.md immediately (prevents re-triggering), then injects a directive for Claude to ask questions and update the file with real answers.
-- **SessionStart policy restructured.** Organized into clear sections (SEARCH FIRST, CONCISE OUTPUT, TASK-SPECIFIC, EFFICIENCY, CONTEXT MANAGEMENT) for better adherence.
-- **Prompt preprocessor now runs on every prompt.** Previously only activated for prompts >3000 chars. Now injects response optimization rules on every turn.
+- **Onboarding guard rewritten.** Creates placeholder CLAUDE.md immediately, then injects blocking directive for questions.
+- **SessionStart policy restructured.** Clear sections: SEARCH FIRST, CONCISE OUTPUT, TASK-SPECIFIC, EFFICIENCY, CONTEXT MANAGEMENT.
+- **Prompt preprocessor runs on every prompt.** Response optimization rules on every turn.
 
 ### Target
-- **70% token savings per session** through combined effects of: concise output rules, auto-compact, blocked reads, compressed bash output, JSON→CSV conversion, and targeted-read enforcement.
+- **70% token savings per session** through combined optimizations.
 
 ---
 

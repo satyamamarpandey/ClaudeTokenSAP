@@ -1,5 +1,5 @@
 /**
- * Token Optimizer v2.0.1 — Comprehensive UAT Runner
+ * Token Optimizer v2.0.2 — Comprehensive UAT Runner
  * Tests all hooks across multiple project types and measures token savings.
  */
 const { execSync } = require("child_process");
@@ -209,7 +209,7 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 
     if (!result.output) throw new Error("No output from SessionStart hook");
     const ctx = result.output.hookSpecificOutput.additionalContext;
-    if (!ctx.includes("TOKEN OPTIMIZER v2.0.1")) throw new Error("Missing version header");
+    if (!ctx.includes("TOKEN OPTIMIZER v2.0.2")) throw new Error("Missing version header");
     if (!ctx.includes("MANDATORY RULES")) throw new Error("Missing mandatory rules");
     if (!ctx.includes("SEARCH FIRST")) throw new Error("Missing SEARCH FIRST section");
     if (!ctx.includes("CONCISE OUTPUT")) throw new Error("Missing CONCISE OUTPUT section");
@@ -583,7 +583,7 @@ test("Onboarding settings.json: deny rules cover all noisy patterns", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.0.1 — UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.0.2 — UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));
