@@ -44,7 +44,7 @@ function compressOutput(raw) {
     parts.push(`[errors/warnings from middle ${skipped} lines]`);
     parts.push(...errorLines.slice(0, 30)); // cap error lines at 30
   } else {
-    parts.push(`[${skipped} lines omitted — no errors/warnings detected]`);
+    parts.push(`[${skipped} lines omitted - no errors/warnings detected]`);
   }
 
   parts.push(`[last ${TAIL_LINES} lines]`);
@@ -67,7 +67,7 @@ function compressOutput(raw) {
 
   const result = compressOutput(output);
   if (!result) {
-    // Output was short enough — pass through
+    // Output was short enough - pass through
     process.exit(0);
   }
 

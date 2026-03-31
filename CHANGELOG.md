@@ -17,13 +17,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - **Token budget tracking** (`lib/token-budget.js`). Estimates token consumption across reads, prompts, bash, and search. Progressive warnings at 60%/80%. Strategic compaction at 70% budget replaces naive every-4-prompts interval.
 - **Error loop detection** (`hooks/error_loop_guard.js`). PostToolUse hook on Bash normalizes error signatures (strips timestamps, paths, numbers) and intervenes after 3 identical failures with actionable guidance.
-- **Search result compression** (`hooks/search_compress.js`). PostToolUse hook for Grep/Glob compresses 40+ results — groups by file (Grep) or directory (Glob), shows top 25 with match counts and sample lines.
+- **Search result compression** (`hooks/search_compress.js`). PostToolUse hook for Grep/Glob compresses 40+ results - groups by file (Grep) or directory (Glob), shows top 25 with match counts and sample lines.
 - **Duplicate read prevention** (`lib/dedup-tracker.js`). Tracks every file read per session with LRU eviction at 50 files. Warns when a file has been read 3+ times.
-- **Binary file blocking** in read guard. Instantly blocks .png, .jpg, .exe, .zip, .mp4, .pdf, .woff2, and 30+ binary extensions — they waste tokens as text.
+- **Binary file blocking** in read guard. Instantly blocks .png, .jpg, .exe, .zip, .mp4, .pdf, .woff2, and 30+ binary extensions - they waste tokens as text.
 - **Structured post-compact briefing.** Resume briefing includes token budget status, efficiency metrics from all subsystems, architecture changes, and file modification categories.
 
 ### Changed
-- **Prompt preprocessor uses strategic compaction.** Replaced `COMPACT_INTERVAL = 4` with `shouldCompact()` from token-budget.js — triggers at 70% budget OR every 6 prompts.
+- **Prompt preprocessor uses strategic compaction.** Replaced `COMPACT_INTERVAL = 4` with `shouldCompact()` from token-budget.js - triggers at 70% budget OR every 6 prompts.
 - **Budget warnings injected into prompt context.** `getWarning()` adds progressive alerts at 60% and 80% consumption.
 - **Session stats enriched.** Prompt preprocessor now reports all subsystem metrics: blocked reads, bash compressed, searches compressed, error loops caught, duplicate reads.
 - **Read guard tracks all reads.** Every read is recorded via dedup-tracker for session-wide visibility.
@@ -35,7 +35,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - **Smart prompt analysis engine** (`lib/prompt-analyzer.js`). Detects app type, framework, language, database, platform, and domain from the user's first prompt using score-based keyword matching with inference maps.
 - **Context-aware onboarding hints.** Onboarding questions now show auto-detected defaults and contextual hints based on prompt analysis (e.g., "[detected: Next.js]").
-- **Write/edit tracking** (`hooks/write_tracker.js`). Silent PostToolUse hook categorizes every file Claude modifies into dependency, config, test, database, api, ui, source, or docs — tracks architecture signals in session state.
+- **Write/edit tracking** (`hooks/write_tracker.js`). Silent PostToolUse hook categorizes every file Claude modifies into dependency, config, test, database, api, ui, source, or docs - tracks architecture signals in session state.
 - **Follow-up gap detection.** Prompts 2-4 check CLAUDE.md for `(pending onboarding)` placeholders and inject targeted follow-up questions.
 - **Architecture change summaries.** Every 5th prompt shows a summary of dependency, DB, API, and config changes detected by write_tracker.
 - **Enriched compaction memory.** Pre-compact now preserves file modifications grouped by category, architecture signal counts, and detected project context across compaction.
@@ -78,7 +78,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.9.0] - 2026-03-30
 
 ### Fixed
-- **First-run onboarding no longer gets stuck.** Previously `onboarding_guard.js` injected a directive telling Claude to ask the user a question and then create `.claude/CLAUDE.md` and `.claude/settings.json`. This required a 2-turn interaction that broke down because the directive was only injected on the first turn — so after the user answered Claude had no instruction to create files and would stall or loop. The hook now creates both files directly (inferring project type from the prompt), then tells Claude "setup complete, proceed." No user questions, no multi-turn dependency.
+- **First-run onboarding no longer gets stuck.** Previously `onboarding_guard.js` injected a directive telling Claude to ask the user a question and then create `.claude/CLAUDE.md` and `.claude/settings.json`. This required a 2-turn interaction that broke down because the directive was only injected on the first turn - so after the user answered Claude had no instruction to create files and would stall or loop. The hook now creates both files directly (inferring project type from the prompt), then tells Claude "setup complete, proceed." No user questions, no multi-turn dependency.
 
 ---
 

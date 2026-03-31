@@ -113,13 +113,13 @@ function checkErrorLoop(signature) {
 
   // Loop detected! Inject intervention
   const intervention = [
-    `[TOKEN OPTIMIZER: ERROR LOOP DETECTED — same error seen ${loopCheck.count} times]`,
+    `[TOKEN OPTIMIZER: ERROR LOOP DETECTED - same error seen ${loopCheck.count} times]`,
     "",
     `Error pattern: ${loopCheck.signature}`,
     "",
     "STOP retrying the same approach. Instead:",
-    "1. Re-read the error message carefully — what is it actually saying?",
-    "2. Check your assumptions — is the file/module/dependency correct?",
+    "1. Re-read the error message carefully - what is it actually saying?",
+    "2. Check your assumptions - is the file/module/dependency correct?",
     "3. Try a fundamentally different approach (different API, different tool, different path)",
     "4. If stuck, ask the user for clarification rather than looping",
     "",

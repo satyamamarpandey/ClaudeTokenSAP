@@ -62,7 +62,7 @@ That creates three practical problems:
 
 ## What’s new in v2.2.1
 
-Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features — token budget intelligence, error loop prevention, search compression, and duplicate read tracking:
+Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features - token budget intelligence, error loop prevention, search compression, and duplicate read tracking:
 
 ### Token budget tracking
 Estimates token consumption across all operations (reads, prompts, bash, search). Progressive warnings at 60% and 80% capacity. Strategic compaction triggers at 70% budget instead of naive prompt counting.
@@ -77,7 +77,7 @@ Grep results with 40+ matches are grouped by file with match counts. Glob result
 Tracks every file read per session. Warns when a file has been read 3+ times. Integrates with the read guard to reduce redundant context consumption.
 
 ### Binary file blocking
-Instantly blocks reads on binary files (.png, .jpg, .exe, .zip, .mp4, .pdf, .woff2, etc.) — they waste tokens and aren’t useful as text.
+Instantly blocks reads on binary files (.png, .jpg, .exe, .zip, .mp4, .pdf, .woff2, etc.) - they waste tokens and aren’t useful as text.
 
 ### Structured post-compact briefing
 After compaction, injects a structured resume briefing with token budget status, efficiency metrics from all subsystems, architecture change summary, and file modification categories.

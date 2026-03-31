@@ -79,7 +79,7 @@ const ASK_RULES = [
   const placeholderMd = [
     `# ${projectName}`,
     "",
-    "<!-- Token Optimizer: onboarding in progress — Claude will update this file -->",
+    "<!-- Token Optimizer: onboarding in progress - Claude will update this file -->",
     "",
     "## Project Info",
     "- Type: (pending onboarding)",
@@ -128,7 +128,7 @@ const ASK_RULES = [
   if (!fs.existsSync(claudeIgnorePath)) {
     try {
       fs.writeFileSync(claudeIgnorePath, [
-        "# Token Optimizer — auto-generated .claudeignore",
+        "# Token Optimizer - auto-generated .claudeignore",
         "# Blocks noisy directories and files from Claude Code indexing",
         "",
         "node_modules/",
@@ -178,7 +178,7 @@ const ASK_RULES = [
 
   // ── Build smart directive with contextual hints ──
   const directive = [
-    "⛔ MANDATORY ONBOARDING — DO NOT WRITE ANY CODE YET ⛔",
+    "⛔ MANDATORY ONBOARDING - DO NOT WRITE ANY CODE YET ⛔",
     "",
     "The user said: \"" + savedPrompt + "\"",
     "",
@@ -208,12 +208,12 @@ const ASK_RULES = [
     "```",
     "1. **What type of app are you building?**",
     detected.appType
-      ? `   [detected: ${detected.appType}] — press Enter to confirm or type to change`
+      ? `   [detected: ${detected.appType}] - press Enter to confirm or type to change`
       : `   ${hints.appType}`,
     "",
     "2. **Language and framework?**",
     detected.framework
-      ? `   [detected: ${detected.framework}${detected.language ? " (" + detected.language + ")" : ""}] — confirm or specify`
+      ? `   [detected: ${detected.framework}${detected.language ? " (" + detected.language + ")" : ""}] - confirm or specify`
       : `   ${hints.framework}`,
     "",
     "3. **Who are the target users?**",
@@ -221,7 +221,7 @@ const ASK_RULES = [
     "",
     "4. **Database?**",
     detected.database
-      ? `   [detected: ${detected.database}] — confirm or correct`
+      ? `   [detected: ${detected.database}] - confirm or correct`
       : `   ${hints.database}`,
     "",
     "5. **Any constraints or preferences?**",
@@ -229,13 +229,13 @@ const ASK_RULES = [
     "```",
     "",
     "AFTER the user answers all 5 questions:",
-    "- Use the Edit tool to update `.claude/CLAUDE.md` — replace every '(pending onboarding)' with real answers",
+    "- Use the Edit tool to update `.claude/CLAUDE.md` - replace every '(pending onboarding)' with real answers",
     "- Add detected domain/platform info if confirmed",
     "- Keep CLAUDE.md under 20 lines, high-signal only",
     "- THEN execute the original request: \"" + savedPrompt.slice(0, 200) + "\"",
     "",
     "⚠️ DO NOT write code, create files, or start building until you have ALL 5 answers.",
-    "⚠️ DO NOT say \"Let me help you build...\" — just ask the 5 questions immediately.",
+    "⚠️ DO NOT say \"Let me help you build...\" - just ask the 5 questions immediately.",
     "⚠️ If user answers briefly (e.g., 'yes' or '1. web, 2. react, ...'), accept defaults and proceed.",
     "",
     "Files auto-created: " + created.join(", "),

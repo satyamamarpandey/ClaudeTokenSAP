@@ -7,7 +7,7 @@ const {
 } = require("../lib/debug-log");
 
 const MAX_ANALYZE_BYTES = 250 * 1024;
-// Only summarize files larger than this — smaller files were already loaded
+// Only summarize files larger than this - smaller files were already loaded
 // in full by the Read tool, so adding a summary on top wastes tokens.
 const MIN_SUMMARIZE_BYTES = 20 * 1024;
 
@@ -307,7 +307,7 @@ function summarizeGeneric(text, filePath) {
 
   const stat = fs.statSync(filePath);
 
-  // Skip summarization for small files — the Read tool already loaded the
+  // Skip summarization for small files - the Read tool already loaded the
   // full content, so appending a summary would only add tokens, not save them.
   if (stat.size < MIN_SUMMARIZE_BYTES) {
     process.exit(0);

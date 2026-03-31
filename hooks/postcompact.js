@@ -101,7 +101,7 @@ function readJsonStdin() {
   // Continuation hints
   lines.push("", "── Resume ──");
   if (nextState.lastBlockedFile) {
-    lines.push(`  Last blocked: ${nextState.lastBlockedFile.filePath.split(/[\\/]/).pop()} — use targeted search`);
+    lines.push(`  Last blocked: ${nextState.lastBlockedFile.filePath.split(/[\\/]/).pop()} - use targeted search`);
   }
   if (nextState.lastReadFile) {
     lines.push(`  Last read: ${nextState.lastReadFile.filePath.split(/[\\/]/).pop()}`);

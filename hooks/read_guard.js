@@ -218,7 +218,7 @@ function buildGuidance(filePath, sizeBytes, ext, mode = "noisy") {
   const sourceCodeType = SOURCE_CODE_EXTENSIONS.has(ext);
   const lockFile = isLockFile(filePath);
 
-  // Binary files are always blocked — they waste tokens and aren't useful as text
+  // Binary files are always blocked - they waste tokens and aren't useful as text
   if (isBinary) {
     appendDebugLog("read_guard_binary_blocked", { filePath, ext });
     mergeSessionState((prev) => ({
@@ -277,7 +277,7 @@ function buildGuidance(filePath, sizeBytes, ext, mode = "noisy") {
         JSON.stringify({
           hookSpecificOutput: {
             hookEventName: "PreToolUse",
-            additionalContext: `[Token Optimizer: This file has been read ${dedupResult.readCount} times this session. Avoid re-reading — use info from prior reads.]`,
+            additionalContext: `[Token Optimizer: This file has been read ${dedupResult.readCount} times this session. Avoid re-reading - use info from prior reads.]`,
           },
         })
       );

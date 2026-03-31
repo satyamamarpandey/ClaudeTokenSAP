@@ -1,5 +1,5 @@
 /**
- * PostToolUse hook for Write/Edit — tracks file modifications in session state.
+ * PostToolUse hook for Write/Edit - tracks file modifications in session state.
  * Used by precompact.js for richer context preservation and CLAUDE.md auto-updates.
  */
 
@@ -68,7 +68,7 @@ function categorizeFile(filePath) {
 
   mergeSessionState((prev) => {
     const modifiedFiles = prev.modifiedFiles || [];
-    // Avoid duplicates — update timestamp if already tracked
+    // Avoid duplicates - update timestamp if already tracked
     const existing = modifiedFiles.findIndex((f) => f.path === filePath);
     if (existing >= 0) {
       modifiedFiles[existing] = { ...modifiedFiles[existing], lastModified: now, count: (modifiedFiles[existing].count || 1) + 1 };
@@ -103,6 +103,6 @@ function categorizeFile(filePath) {
 
   appendDebugLog("write_tracked", { filePath: baseName, category });
 
-  // Silent — no output to Claude, just state tracking
+  // Silent - no output to Claude, just state tracking
   process.exit(0);
 })();

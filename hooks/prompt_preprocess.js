@@ -109,7 +109,7 @@ function tryCompressJsonInPrompt(prompt) {
       const after = csv.length;
       const pct = Math.round((1 - after / before) * 100);
       return {
-        replacement: prompt.replace(jsonStr, `[Converted to CSV — ${pct}% smaller]\n${csv}`),
+        replacement: prompt.replace(jsonStr, `[Converted to CSV - ${pct}% smaller]\n${csv}`),
         savings: pct,
         mode: "csv",
       };
@@ -124,7 +124,7 @@ function tryCompressJsonInPrompt(prompt) {
       const after = summary.length;
       const pct = Math.round((1 - after / before) * 100);
       return {
-        replacement: prompt.replace(jsonStr, `[JSON summarized — ${pct}% smaller]\n${summary}`),
+        replacement: prompt.replace(jsonStr, `[JSON summarized - ${pct}% smaller]\n${summary}`),
         savings: pct,
         mode: "summary",
       };
@@ -159,7 +159,7 @@ function tryCompressLogInPrompt(prompt) {
     ...head,
     errors.length > 0
       ? `[${errors.length} error/warning lines from middle]`
-      : `[${lines.length - 30} lines omitted — no errors]`,
+      : `[${lines.length - 30} lines omitted - no errors]`,
     ...(errors.length > 0 ? errors : []),
     "[Last 15 lines]",
     ...tail,
@@ -206,14 +206,14 @@ function tryCompressLogInPrompt(prompt) {
         savings: jsonResult.savings,
       });
       contextLines.push(
-        `[Token Optimizer: JSON ${jsonResult.mode === "csv" ? "converted to CSV" : "summarized"} — ${jsonResult.savings}% token savings]`
+        `[Token Optimizer: JSON ${jsonResult.mode === "csv" ? "converted to CSV" : "summarized"} - ${jsonResult.savings}% token savings]`
       );
       // Note: We inject guidance but can't modify the prompt itself via hooks.
       // The additionalContext tells Claude the data was compressed.
       if (jsonResult.mode === "csv") {
         contextLines.push("The JSON data in this prompt is flat/tabular. Treat it as CSV for efficiency.");
       } else {
-        contextLines.push("The JSON data is nested. A schema+sample summary is sufficient — do not request the full JSON.");
+        contextLines.push("The JSON data is nested. A schema+sample summary is sufficient - do not request the full JSON.");
       }
     }
   }
@@ -264,17 +264,17 @@ function tryCompressLogInPrompt(prompt) {
             "",
             `[Token Optimizer: CLAUDE.md still has placeholder values for: ${pendingFields.join(", ")}.`,
             "Before executing this prompt, ask the user to confirm these fields.",
-            "Format: \"I still need to know your [field] — [contextual hint]. Then I'll continue with your request.\"]"
+            "Format: \"I still need to know your [field] - [contextual hint]. Then I'll continue with your request.\"]"
           );
           appendDebugLog("followup_gaps", { gaps: pendingFields, promptCount });
         }
       }
     } catch {
-      // CLAUDE.md doesn't exist yet — skip
+      // CLAUDE.md doesn't exist yet - skip
     }
   }
 
-  // ── 5b. Architecture tracking — inject summary of what was modified ──
+  // ── 5b. Architecture tracking - inject summary of what was modified ──
   if (promptCount >= 3) {
     const archSignals = state.archSignals || {};
     const archNotes = [];

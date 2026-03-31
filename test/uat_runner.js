@@ -1,5 +1,5 @@
 /**
- * Token Optimizer v2.2.1 — Comprehensive UAT Runner
+ * Token Optimizer v2.2.1 - Comprehensive UAT Runner
  * Tests all hooks across multiple project types and measures token savings.
  */
 const { execSync } = require("child_process");
@@ -203,7 +203,7 @@ function test(name, fn) {
 // ═══════════════════════════════════════════════════════════════════════
 
 for (const [projectKey, project] of Object.entries(PROJECTS)) {
-  test(`SessionStart: ${project.desc} — stack detection + policy injection`, () => {
+  test(`SessionStart: ${project.desc} - stack detection + policy injection`, () => {
     const dir = createProjectDir(projectKey, project.files);
     const result = runHook("instructions_loaded.js", { cwd: dir, source: "startup", model: "opus" });
 
@@ -221,14 +221,14 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 2: Onboarding Guard — first run vs repeat
+// TEST SUITE 2: Onboarding Guard - first run vs repeat
 // ═══════════════════════════════════════════════════════════════════════
 
 test("Onboarding: triggers on fresh project (no CLAUDE.md)", () => {
   const dir = createProjectDir("onboard-fresh", { "package.json": "{}" });
   const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "Build me a todo app" });
 
-  if (!result.output) throw new Error("No output — onboarding should trigger");
+  if (!result.output) throw new Error("No output - onboarding should trigger");
   const ctx = result.output.hookSpecificOutput.additionalContext;
   if (!ctx.includes("MANDATORY ONBOARDING")) throw new Error("Missing blocking onboarding directive");
   if (!ctx.includes("DO NOT WRITE ANY CODE")) throw new Error("Missing code-blocking language");
@@ -265,11 +265,11 @@ test("Onboarding: skips when CLAUDE.md already exists", () => {
   // Should produce no output (process.exit(0))
   if (result.output) throw new Error("Should not trigger when CLAUDE.md exists");
   cleanup(dir);
-  return { detail: "Correctly skipped — no onboarding directive injected" };
+  return { detail: "Correctly skipped - no onboarding directive injected" };
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 3: Prompt Preprocessor — JSON compression
+// TEST SUITE 3: Prompt Preprocessor - JSON compression
 // ═══════════════════════════════════════════════════════════════════════
 
 test("PromptPreprocess: flat JSON → CSV advisory", () => {
@@ -283,7 +283,7 @@ test("PromptPreprocess: flat JSON → CSV advisory", () => {
 
   const originalTokens = tokenEstimate(json);
   return {
-    detail: `Flat JSON (${json.length} chars, ~${originalTokens} tokens) — advisory injected`,
+    detail: `Flat JSON (${json.length} chars, ~${originalTokens} tokens) - advisory injected`,
     tokensOriginal: originalTokens,
     tokensSaved: Math.round(originalTokens * 0.3), // Advisory-based savings estimate
   };
@@ -299,13 +299,13 @@ test("PromptPreprocess: nested JSON → schema summary advisory", () => {
 
   const originalTokens = tokenEstimate(json);
   return {
-    detail: `Nested JSON (${json.length} chars, ~${originalTokens} tokens) — schema summary advisory`,
+    detail: `Nested JSON (${json.length} chars, ~${originalTokens} tokens) - schema summary advisory`,
     tokensOriginal: originalTokens,
     tokensSaved: Math.round(originalTokens * 0.5),
   };
 });
 
-test("PromptPreprocess: small prompt — response rules only", () => {
+test("PromptPreprocess: small prompt - response rules only", () => {
   const prompt = "What does the main function do?";
   const result = runHook("prompt_preprocess.js", { cwd: TEMP_ROOT, prompt });
 
@@ -318,7 +318,7 @@ test("PromptPreprocess: small prompt — response rules only", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 4: Prompt Preprocessor — Log compression
+// TEST SUITE 4: Prompt Preprocessor - Log compression
 // ═══════════════════════════════════════════════════════════════════════
 
 test("PromptPreprocess: large log output → compression advisory", () => {
@@ -332,14 +332,14 @@ test("PromptPreprocess: large log output → compression advisory", () => {
 
   const originalTokens = tokenEstimate(log);
   return {
-    detail: `Log (${log.split("\n").length} lines, ~${originalTokens} tokens) — compression advisory`,
+    detail: `Log (${log.split("\n").length} lines, ~${originalTokens} tokens) - compression advisory`,
     tokensOriginal: originalTokens,
     tokensSaved: Math.round(originalTokens * 0.6),
   };
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 5: Read Guard — large file blocking
+// TEST SUITE 5: Read Guard - large file blocking
 // ═══════════════════════════════════════════════════════════════════════
 
 test("ReadGuard: blocks large JSON file (>120KB)", () => {
@@ -363,7 +363,7 @@ test("ReadGuard: blocks large JSON file (>120KB)", () => {
   const tokensSaved = tokenEstimate(bigJson);
   cleanup(dir);
   return {
-    detail: `Blocked ${sizeKB}KB JSON — saved ~${tokensSaved} tokens`,
+    detail: `Blocked ${sizeKB}KB JSON - saved ~${tokensSaved} tokens`,
     tokensOriginal: tokensSaved,
     tokensSaved,
   };
@@ -432,14 +432,14 @@ test("ReadGuard: blocks node_modules files", () => {
   const tokensSaved = tokenEstimate(fs.readFileSync(filePath, "utf8"));
   cleanup(dir);
   return {
-    detail: `node_modules file blocked — saved ~${tokensSaved} tokens`,
+    detail: `node_modules file blocked - saved ~${tokensSaved} tokens`,
     tokensOriginal: tokensSaved,
     tokensSaved,
   };
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 6: Bash Compress — large output compression
+// TEST SUITE 6: Bash Compress - large output compression
 // ═══════════════════════════════════════════════════════════════════════
 
 test("BashCompress: compresses large bash output", () => {
@@ -458,7 +458,7 @@ test("BashCompress: compresses large bash output", () => {
   // The hook should suggest compression or inject guidance
   const originalTokens = tokenEstimate(bigOutput);
   return {
-    detail: `Bash output (${bigOutput.split("\n").length} lines, ~${originalTokens} tokens) — compressed`,
+    detail: `Bash output (${bigOutput.split("\n").length} lines, ~${originalTokens} tokens) - compressed`,
     tokensOriginal: originalTokens,
     tokensSaved: Math.round(originalTokens * 0.7),
   };
@@ -476,7 +476,7 @@ test("BashCompress: passes through small bash output", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 7: File Read Compress — post-read compression
+// TEST SUITE 7: File Read Compress - post-read compression
 // ═══════════════════════════════════════════════════════════════════════
 
 test("FileReadCompress: compresses large JSON read result", () => {
@@ -489,14 +489,14 @@ test("FileReadCompress: compresses large JSON read result", () => {
 
   const originalTokens = tokenEstimate(jsonContent);
   return {
-    detail: `Post-read JSON (${jsonContent.length} chars, ~${originalTokens} tokens) — compression applied`,
+    detail: `Post-read JSON (${jsonContent.length} chars, ~${originalTokens} tokens) - compression applied`,
     tokensOriginal: originalTokens,
     tokensSaved: Math.round(originalTokens * 0.4),
   };
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// TEST SUITE 8: PreCompact + PostCompact — session state
+// TEST SUITE 8: PreCompact + PostCompact - session state
 // ═══════════════════════════════════════════════════════════════════════
 
 test("PreCompact: preserves session state", () => {
@@ -543,7 +543,7 @@ test("PromptPreprocess: auto-compact reminder at prompt #4", () => {
   // Check if compact reminder appears (may depend on session state across tests)
   const hasReminder = ctx.includes("/compact") || ctx.includes("compact");
 
-  return { detail: `Prompt #4 — compact reminder ${hasReminder ? "present" : "skipped (counter may differ from isolated run)"}` };
+  return { detail: `Prompt #4 - compact reminder ${hasReminder ? "present" : "skipped (counter may differ from isolated run)"}` };
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -572,7 +572,7 @@ test("Onboarding settings.json: deny rules cover all noisy patterns", () => {
   if (missingAsk.length) throw new Error(`Missing ask: ${missingAsk.join(", ")}`);
 
   cleanup(dir);
-  return { detail: `${deny.length} deny rules, ${ask.length} ask rules — all required patterns covered` };
+  return { detail: `${deny.length} deny rules, ${ask.length} ask rules - all required patterns covered` };
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -725,7 +725,7 @@ test("Read guard: blocks binary file extensions", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.2.1 — UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.2.1 - UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));
@@ -771,7 +771,7 @@ for (const [name, info] of Object.entries(features)) {
 }
 
 console.log("═".repeat(72));
-console.log(`  VERDICT: ${results.totals.failed === 0 ? "ALL TESTS PASSED" : `${results.totals.failed} FAILURES — needs fixes`}`);
+console.log(`  VERDICT: ${results.totals.failed === 0 ? "ALL TESTS PASSED" : `${results.totals.failed} FAILURES - needs fixes`}`);
 console.log("═".repeat(72));
 
 // Exit with error if any test failed

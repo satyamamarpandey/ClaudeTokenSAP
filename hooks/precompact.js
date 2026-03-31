@@ -105,7 +105,7 @@ function recentDebugEvents(limit = 5) {
   try {
     const md = fs.readFileSync(claudeMdPath, "utf8");
     if (md.includes("pending onboarding")) {
-      lines.push("- NOTE: .claude/CLAUDE.md still has placeholder values — onboarding was not completed");
+      lines.push("- NOTE: .claude/CLAUDE.md still has placeholder values - onboarding was not completed");
     }
   } catch {}
 
@@ -114,7 +114,7 @@ function recentDebugEvents(limit = 5) {
     "",
     "AFTER COMPACTION: If you learned anything new about the project during this session",
     "(stack, key files, architecture patterns, constraints), update .claude/CLAUDE.md",
-    "using the Edit tool. Keep it concise — max 20 lines total."
+    "using the Edit tool. Keep it concise - max 20 lines total."
   );
 
   const events = recentDebugEvents(4);
