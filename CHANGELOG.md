@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.0.1] - 2026-03-31
+
+### Fixed
+- **Onboarding questions now enforced.** Rewrote the onboarding directive with consequence-framing ("entire session wasted if you guess wrong") so Claude cannot skip questions and jump straight to building. Previously, `additionalContext` was too weak and Claude would ignore it when the user's prompt was directly actionable (e.g., "Create a Calculator" → built a web app without asking if they wanted mobile).
+- **`.claudeignore` auto-created on first run.** The onboarding guard now creates a `.claudeignore` file alongside `CLAUDE.md` and `settings.json`, blocking noisy directories (`node_modules/`, `dist/`, `build/`, `.next/`, etc.) at the file-discovery level — complementing the settings.json deny rules which only block tool actions.
+
+### Added
+- **CLAUDE.md as living source of truth.** SessionStart policy now instructs Claude to always read `.claude/CLAUDE.md` before starting any task and use it for stack/platform/user info instead of rescanning the codebase.
+- **Continuous CLAUDE.md improvement.** Prompt preprocessor reminds Claude every 3 prompts to check if new project facts were learned and append them to CLAUDE.md (max 30 lines).
+- **Pending onboarding detection.** If CLAUDE.md still has `(pending onboarding)` placeholders, Claude is instructed to ask the user to fill them in before proceeding.
+
+---
+
 ## [2.0.0] - 2026-03-31
 
 ### Added
