@@ -14,95 +14,139 @@ function readJsonStdin() {
   });
 }
 
-// Derive ONE focused question based on what the user is asking to build.
-// Returns null if the prompt is too vague or not a "build" prompt.
-function deriveQuestion(prompt) {
+function inferProject(prompt, cwd) {
   const p = prompt.toLowerCase();
+  const name = path.basename(cwd) || "Project";
 
   if (/\b(website|web app|webapp|frontend|react|next\.?js|vue|svelte|dashboard|landing page|portfolio)\b/.test(p)) {
-    return "Stack? 1) Next.js (full-stack) 2) React (SPA) 3) Static HTML — I'll default to Next.js";
+    return { name, type: "Web app", stack: "Next.js", users: "Web users" };
   }
-  if (/\b(api|backend|server|rest|graphql|endpoint|microservice|service)\b/.test(p)) {
-    return "Runtime? 1) Node.js/Express 2) Python/FastAPI 3) Node.js/Hono — I'll default to Node.js/Express";
+  if (/\b(api|backend|server|rest|graphql|endpoint|microservice)\b/.test(p)) {
+    return { name, type: "API / backend service", stack: "Node.js", users: "API consumers" };
   }
   if (/\b(calculator|calc|converter|formatter|tool|utility)\b/.test(p)) {
-    return "Complexity? 1) Basic 2) Scientific/advanced 3) Domain-specific — I'll default to Basic";
+    return { name, type: "Utility tool", stack: "Node.js", users: "End users" };
   }
   if (/\b(cli|command.?line|terminal|script|automation)\b/.test(p)) {
-    return "Language? 1) Node.js 2) Python 3) Bash — I'll default to Node.js";
+    return { name, type: "CLI tool", stack: "Node.js", users: "Developers" };
   }
   if (/\b(game|puzzle|quiz|trivia)\b/.test(p)) {
-    return "Platform? 1) Browser (HTML5/Canvas) 2) Terminal/CLI 3) Mobile — I'll default to Browser";
+    return { name, type: "Browser game", stack: "HTML5 / JavaScript", users: "Players" };
   }
   if (/\b(mobile|ios|android|react native|flutter)\b/.test(p)) {
-    return "Framework? 1) React Native 2) Flutter 3) Expo — I'll default to React Native";
+    return { name, type: "Mobile app", stack: "React Native", users: "Mobile users" };
   }
   if (/\b(chat|chatbot|bot|assistant|ai)\b/.test(p)) {
-    return "Interface? 1) Web chat UI 2) Slack/Discord bot 3) CLI — I'll default to Web chat UI";
+    return { name, type: "AI chat interface", stack: "Next.js + AI SDK", users: "End users" };
   }
   if (/\b(blog|cms|content|store|shop|e-?commerce)\b/.test(p)) {
-    return "Stack? 1) Next.js + Markdown 2) Next.js + CMS 3) Static site — I'll default to Next.js + Markdown";
+    return { name, type: "Content / e-commerce site", stack: "Next.js", users: "Customers" };
   }
   if (/\b(database|schema|migration|model|orm)\b/.test(p)) {
-    return "DB? 1) PostgreSQL 2) SQLite 3) MongoDB — I'll default to PostgreSQL";
+    return { name, type: "Data layer", stack: "Node.js + PostgreSQL", users: "Developers" };
   }
 
-  // Generic create/build prompt — ask for platform
-  if (/\b(create|build|make|write|generate|develop|implement|design)\b/.test(p)) {
-    return "What type? 1) Web app 2) API/service 3) CLI tool 4) Script — I'll default to Web app";
-  }
-
-  return null; // Not a build prompt — no onboarding question needed
+  return { name, type: "Application", stack: "Node.js", users: "Developers" };
 }
+
+const DENY_RULES = [
+  "Read(node_modules/**)",
+  "Read(dist/**)",
+  "Read(build/**)",
+  "Read(.next/**)",
+  "Read(coverage/**)",
+  "Read(.turbo/**)",
+  "Read(vendor/**)",
+  "Read(out/**)",
+  "Read(**/*.lock)",
+  "Read(**/*.log)",
+  "Read(**/*.map)",
+  "Read(**/*.min.js)"
+];
 
 (async () => {
   const payload = await readJsonStdin();
   const cwd = payload.cwd || process.cwd();
   const prompt = payload.prompt || "";
 
-  // Skip if .claude/CLAUDE.md already exists — onboarding was done previously
   const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
+
+  // Skip if already onboarded
   if (fs.existsSync(claudeMdPath)) {
-    appendDebugLog("onboarding_guard_skip", { reason: "CLAUDE.md exists", cwd });
+    appendDebugLog("onboarding_skip", { reason: "CLAUDE.md exists", cwd });
     process.exit(0);
   }
 
-  // Skip if we already injected the onboarding directive this session
+  // Skip if already ran this session
   const state = readSessionState();
-  if (state.onboardingAsked) {
-    appendDebugLog("onboarding_guard_skip", { reason: "already asked this session" });
+  if (state.onboardingDone) {
+    appendDebugLog("onboarding_skip", { reason: "already done this session" });
     process.exit(0);
   }
 
-  const question = deriveQuestion(prompt);
+  mergeSessionState((prev) => ({ ...prev, onboardingDone: true }));
 
-  appendDebugLog("onboarding_guard_trigger", { cwd, promptLength: prompt.length, question });
+  const project = inferProject(prompt, cwd);
+  const claudeDir = path.join(cwd, ".claude");
+  const created = [];
 
-  mergeSessionState((prev) => ({ ...prev, onboardingAsked: true }));
+  // Ensure .claude/ exists
+  try { fs.mkdirSync(claudeDir, { recursive: true }); } catch {}
 
-  const directive = question
-    ? [
-        "FIRST-RUN ONBOARDING:",
-        `Ask the user this ONE question before starting: "${question}"`,
-        "After they reply (or if they say skip/default), immediately create:",
-        "  1. .claude/CLAUDE.md — max 12 lines: what is being built, inferred target users, platform/stack, model strategy (use lightweight models for simple tasks), key constraints",
-        "  2. .claude/settings.json — with deny rules for: node_modules/**, dist/**, build/**, .next/**, coverage/**, .turbo/**, vendor/**, out/**, **/*.lock, **/*.log, **/*.map, **/*.min.js",
-        "Then proceed with the original request. Do NOT ask any other questions.",
-      ].join("\n")
-    : [
-        "FIRST-RUN SETUP:",
-        "Before starting, create these two files:",
-        "  1. .claude/CLAUDE.md — max 12 lines: infer what is being built from the prompt, target users, platform, model strategy, key constraints",
-        "  2. .claude/settings.json — with deny rules for: node_modules/**, dist/**, build/**, .next/**, coverage/**, .turbo/**, vendor/**, out/**, **/*.lock, **/*.log, **/*.map, **/*.min.js",
-        "Then proceed immediately. Do NOT ask any questions.",
-      ].join("\n");
+  // Write CLAUDE.md
+  const claudeMd = [
+    `# ${project.name}`,
+    `Building: ${project.type}`,
+    `Stack: ${project.stack}`,
+    `Users: ${project.users}`,
+    ``,
+    `# AI strategy`,
+    `Use Haiku for simple tasks; Sonnet for main development work.`,
+    `Keep context low: Grep before Read, targeted reads only, no whole-file loads.`,
+    ``,
+    `# Rules`,
+    `Concise responses. No overengineering. No unrequested extras.`,
+  ].join("\n");
 
-  process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "UserPromptSubmit",
-        additionalContext: directive,
-      },
-    })
-  );
+  try {
+    fs.writeFileSync(claudeMdPath, claudeMd, "utf8");
+    created.push(".claude/CLAUDE.md");
+  } catch (e) {
+    appendDebugLog("onboarding_error", { file: "CLAUDE.md", error: e.message });
+  }
+
+  // Write settings.json (only if not present)
+  const settingsPath = path.join(claudeDir, "settings.json");
+  if (!fs.existsSync(settingsPath)) {
+    try {
+      fs.writeFileSync(
+        settingsPath,
+        JSON.stringify({ permissions: { deny: DENY_RULES } }, null, 2),
+        "utf8"
+      );
+      created.push(".claude/settings.json");
+    } catch (e) {
+      appendDebugLog("onboarding_error", { file: "settings.json", error: e.message });
+    }
+  }
+
+  appendDebugLog("onboarding_done", { cwd, project, created });
+
+  if (created.length > 0) {
+    const lines = [
+      "First-run project setup complete:",
+      ...created.map((f) => `  \u2713 ${f}`),
+      `  Project: ${project.type} (${project.stack})`,
+      "",
+      "Proceed with the original request immediately. Do not mention these files.",
+    ];
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: "UserPromptSubmit",
+          additionalContext: lines.join("\n"),
+        },
+      })
+    );
+  }
 })();

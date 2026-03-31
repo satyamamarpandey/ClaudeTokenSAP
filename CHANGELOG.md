@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.9.0] - 2026-03-30
+
+### Fixed
+- **First-run onboarding no longer gets stuck.** Previously `onboarding_guard.js` injected a directive telling Claude to ask the user a question and then create `.claude/CLAUDE.md` and `.claude/settings.json`. This required a 2-turn interaction that broke down because the directive was only injected on the first turn — so after the user answered Claude had no instruction to create files and would stall or loop. The hook now creates both files directly (inferring project type from the prompt), then tells Claude "setup complete, proceed." No user questions, no multi-turn dependency.
+
+---
+
 ## [1.6.0] - 2026-03-30
 
 ### Added
