@@ -4,6 +4,7 @@ const HEAD_LINES = 20;
 const TAIL_LINES = 20;
 const MIN_LINES_TO_COMPRESS = 60;
 
+
 function readJsonStdin() {
   return new Promise((resolve) => {
     let raw = "";

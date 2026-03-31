@@ -1,5 +1,6 @@
 # Token Optimizer Plugin - Build Rules
 
+
 ## Goal
 Build a production-ready Claude Code plugin that minimizes token usage across a session while preserving user control.
 

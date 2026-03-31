@@ -17,7 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.3.0] - 2026-03-31
+## [2.3.1] - 2026-03-31
 
 ### Added (inspired by [obra/superpowers](https://github.com/obra/superpowers))
 - **Verification Before Completion** (`hooks/verification_guard.js`). Stop hook that enforces evidence-based verification before claiming work is done. Checks if tests/builds were run, bugs were verified fixed, and files exist. Prevents wasted tokens from rework after false "done" claims.
@@ -32,14 +32,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.2.1] - 2026-03-31
+## [2.3.1] - 2026-03-31
 
 ### Fixed
 - **PreCompact/PostCompact hook schema validation**. Replaced invalid `hookSpecificOutput` with `hookEventName: "PreCompact"/"PostCompact"` (not recognized by Claude Code) with valid `systemMessage` field. Hooks now pass schema validation and inject context correctly during compaction.
 
 ---
 
-## [2.2.0] - 2026-03-31
+## [2.3.1] - 2026-03-31
 
 ### Added
 - **Token budget tracking** (`lib/token-budget.js`). Estimates token consumption across reads, prompts, bash, and search. Progressive warnings at 60%/80%. Strategic compaction at 70% budget replaces naive every-4-prompts interval.
@@ -57,7 +57,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.1.0] - 2026-03-31
+## [2.3.1] - 2026-03-31
 
 ### Added
 - **Smart prompt analysis engine** (`lib/prompt-analyzer.js`). Detects app type, framework, language, database, platform, and domain from the user's first prompt using score-based keyword matching with inference maps.
@@ -69,7 +69,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.0.2] - 2026-03-31
+## [2.3.1] - 2026-03-31
 
 ### Fixed
 - **Onboarding questions now enforced.** Rewrote the onboarding directive with consequence-framing so Claude cannot skip questions and jump straight to building.
