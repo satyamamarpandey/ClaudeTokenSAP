@@ -387,7 +387,7 @@ claude plugin install token-optimizer@claudetokensap-marketplace
 
 For deeper session optimization, advanced context shaping, and stronger plugin configuration patterns, see:
 
-**https://docs.anthropic.com/en/docs/claude-code/overview**
+**https://github.com/satyamamarpandey/OptiClaude**
 
 ### 3. Restart Claude Code
 
