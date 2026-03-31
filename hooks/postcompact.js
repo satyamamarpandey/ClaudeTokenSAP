@@ -3,6 +3,8 @@ const {
   mergeSessionState,
   readSessionState,
 } = require("../lib/debug-log");
+const { getUsage } = require("../lib/token-budget");
+const { getDedupStats } = require("../lib/dedup-tracker");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -27,32 +29,87 @@ function readJsonStdin() {
     lastCompactedAt: new Date().toISOString(),
   }));
 
-  // Calculate session efficiency metrics
+  // Gather metrics from all subsystems
   const promptCount = nextState.promptCount || 0;
   const blockedReads = nextState.blockedReads || 0;
   const compressedBash = nextState.bashCompressCount || 0;
+  const searchCompressed = nextState.searchCompressCount || 0;
+  const errorLoops = nextState.errorLoopsDetected || 0;
   const compactions = nextState.compactionCount || 0;
-  const totalSavings = blockedReads + compressedBash + compactions;
+  const duplicateReads = nextState.duplicateReads || 0;
+
+  const usage = getUsage();
+  const dedupStats = getDedupStats();
 
   const lines = [
-    "Token Optimizer: post-compact",
-    `- compaction #${compactions} complete`,
-    `- session prompts: ${promptCount}`,
-    `- total savings actions: ${totalSavings} (${blockedReads} reads blocked, ${compressedBash} outputs compressed)`,
+    "TOKEN OPTIMIZER: POST-COMPACT RESUME BRIEFING",
+    "═══════════════════════════════════════════════",
+    "",
+    `Session: ${promptCount} prompts | compaction #${compactions}`,
   ];
 
-  // Continuation hints
-  if (nextState.lastBlockedFile) {
-    lines.push(`- tip: inspect ${nextState.lastBlockedFile.filePath.split(/[\\/]/).pop()} with targeted search`);
-  }
-  if (nextState.lastReadFile) {
-    lines.push(`- tip: continue from ${nextState.lastReadFile.filePath.split(/[\\/]/).pop()} if needed`);
-  }
-
-  // Remind about CLAUDE.md updates
+  // Token budget status
   lines.push(
     "",
-    "IMPORTANT: Update .claude/CLAUDE.md now if you learned new project info.",
+    "── Budget ──",
+    `  Consumed: ~${usage.consumed.toLocaleString()} tokens (${usage.pct}% of ${usage.total.toLocaleString()})`,
+  );
+  if (usage.savings.total > 0) {
+    lines.push(`  Saved: ~${usage.savings.total.toLocaleString()} tokens via optimization`);
+  }
+
+  // Efficiency metrics
+  const totalActions = blockedReads + compressedBash + searchCompressed + errorLoops + duplicateReads;
+  if (totalActions > 0) {
+    lines.push(
+      "",
+      "── Efficiency ──",
+    );
+    if (blockedReads > 0) lines.push(`  ${blockedReads} large reads blocked`);
+    if (compressedBash > 0) lines.push(`  ${compressedBash} bash outputs compressed`);
+    if (searchCompressed > 0) lines.push(`  ${searchCompressed} search results compressed`);
+    if (errorLoops > 0) lines.push(`  ${errorLoops} error loops detected & interrupted`);
+    if (duplicateReads > 0) lines.push(`  ${duplicateReads} duplicate reads flagged`);
+  }
+
+  // Architecture signals
+  const archSignals = nextState.archSignals || {};
+  const archNotes = [];
+  if (archSignals.depsModified) archNotes.push(`deps:${archSignals.depsModified}`);
+  if (archSignals.dbModified) archNotes.push(`db:${archSignals.dbModified}`);
+  if (archSignals.apiModified) archNotes.push(`api:${archSignals.apiModified}`);
+  if (archSignals.configModified) archNotes.push(`config:${archSignals.configModified}`);
+  if (archSignals.testModified) archNotes.push(`test:${archSignals.testModified}`);
+  if (archNotes.length > 0) {
+    lines.push(
+      "",
+      `── Architecture changes: ${archNotes.join(", ")} ──`
+    );
+  }
+
+  // Files modified by category (from write_tracker)
+  const fileModsByCategory = nextState.fileModsByCategory || {};
+  const modCategories = Object.entries(fileModsByCategory).filter(([, v]) => v > 0);
+  if (modCategories.length > 0) {
+    lines.push(
+      "",
+      "── Files modified ──",
+      `  ${modCategories.map(([cat, n]) => `${cat}:${n}`).join(", ")}`
+    );
+  }
+
+  // Continuation hints
+  lines.push("", "── Resume ──");
+  if (nextState.lastBlockedFile) {
+    lines.push(`  Last blocked: ${nextState.lastBlockedFile.filePath.split(/[\\/]/).pop()} — use targeted search`);
+  }
+  if (nextState.lastReadFile) {
+    lines.push(`  Last read: ${nextState.lastReadFile.filePath.split(/[\\/]/).pop()}`);
+  }
+
+  lines.push(
+    "",
+    "IMPORTANT: Update .claude/CLAUDE.md if you learned new project info.",
     "Continue with the user's last task. Stay concise."
   );
 

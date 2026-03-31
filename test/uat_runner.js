@@ -1,5 +1,5 @@
 /**
- * Token Optimizer v2.0.2 — Comprehensive UAT Runner
+ * Token Optimizer v2.2.0 — Comprehensive UAT Runner
  * Tests all hooks across multiple project types and measures token savings.
  */
 const { execSync } = require("child_process");
@@ -209,7 +209,7 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 
     if (!result.output) throw new Error("No output from SessionStart hook");
     const ctx = result.output.hookSpecificOutput.additionalContext;
-    if (!ctx.includes("TOKEN OPTIMIZER v2.0.2")) throw new Error("Missing version header");
+    if (!ctx.includes("TOKEN OPTIMIZER v2.2.0")) throw new Error("Missing version header");
     if (!ctx.includes("MANDATORY RULES")) throw new Error("Missing mandatory rules");
     if (!ctx.includes("SEARCH FIRST")) throw new Error("Missing SEARCH FIRST section");
     if (!ctx.includes("CONCISE OUTPUT")) throw new Error("Missing CONCISE OUTPUT section");
@@ -519,7 +519,7 @@ test("PostCompact: increments compaction count + provides metrics", () => {
 
   if (!result.output) throw new Error("No output from postcompact");
   const ctx = result.output.hookSpecificOutput.additionalContext;
-  if (!ctx.includes("post-compact")) throw new Error("Missing post-compact header");
+  if (!ctx.toLowerCase().includes("post-compact")) throw new Error("Missing post-compact header");
   if (!ctx.includes("compaction #")) throw new Error("Missing compaction count");
   if (!ctx.includes("Update .claude/CLAUDE.md")) throw new Error("Missing CLAUDE.md update reminder");
 
@@ -576,6 +576,148 @@ test("Onboarding settings.json: deny rules cover all noisy patterns", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 11: Token budget tracking
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Token budget: addTokens tracks consumption and getUsage reports it", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const { addTokens, getUsage, getWarning, shouldCompact } = require("../lib/token-budget");
+
+  // Add some tokens
+  addTokens("prompt", 4000); // ~1000 tokens
+  addTokens("read", 8000);   // ~2000 tokens
+
+  const usage = getUsage();
+  if (usage.consumed < 2000) throw new Error(`Expected >=2000 consumed, got ${usage.consumed}`);
+  if (!usage.breakdown.prompt) throw new Error("Missing prompt breakdown");
+  if (!usage.breakdown.read) throw new Error("Missing read breakdown");
+
+  // Warning should be null at low usage
+  const warn = getWarning();
+  if (warn !== null) throw new Error("Expected no warning at low usage");
+
+  // Compact should not trigger at low usage
+  const compact = shouldCompact();
+  if (compact.should) throw new Error("Should not compact at low usage");
+
+  return { detail: `consumed=${usage.consumed}, pct=${usage.pct}%, budget working` };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 12: Dedup tracker
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Dedup tracker: detects duplicate file reads", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const { recordRead, checkDuplicate, getDedupStats } = require("../lib/dedup-tracker");
+
+  const r1 = recordRead("/test/file.js");
+  if (r1.isDuplicate) throw new Error("First read should not be duplicate");
+
+  const r2 = recordRead("/test/file.js");
+  if (!r2.isDuplicate) throw new Error("Second read should be duplicate");
+  if (r2.readCount !== 2) throw new Error(`Expected readCount=2, got ${r2.readCount}`);
+
+  const check = checkDuplicate("/test/file.js");
+  if (!check.isDuplicate) throw new Error("checkDuplicate should return true");
+
+  const stats = getDedupStats();
+  if (stats.totalFiles < 1) throw new Error("Expected at least 1 tracked file");
+  if (stats.duplicates < 1) throw new Error("Expected at least 1 duplicate");
+
+  return { detail: `reads=${stats.totalReads}, dupes=${stats.duplicates}` };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 13: Search compression
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Search compress: compresses large Grep results", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  // Generate 50+ lines of grep-like output
+  const grepLines = [];
+  for (let i = 0; i < 60; i++) {
+    const file = `src/file${i % 8}.js`;
+    grepLines.push(`${file}:${i + 1}:const x = ${i};`);
+  }
+
+  const result = runHook("search_compress.js", {
+    tool_name: "Grep",
+    tool_response: { output: grepLines.join("\n") },
+    tool_input: { pattern: "const x" },
+  });
+
+  if (!result.output) throw new Error("No output from search_compress");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("compressed")) throw new Error("Missing compression indicator");
+  if (!ctx.includes("matches")) throw new Error("Missing match count info");
+
+  return { detail: `${grepLines.length} lines compressed successfully` };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 14: Error loop detection
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Error loop guard: detects repeated errors after 3 occurrences", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  const errorOutput = "Error: Cannot find module 'express'\n    at Function.Module._resolveFilename";
+
+  // First two should not trigger intervention
+  for (let i = 0; i < 2; i++) {
+    runHook("error_loop_guard.js", {
+      tool_name: "Bash",
+      tool_response: { output: errorOutput, exit_code: 1 },
+      tool_input: { command: "node index.js" },
+    });
+  }
+
+  // Third should trigger
+  const result = runHook("error_loop_guard.js", {
+    tool_name: "Bash",
+    tool_response: { output: errorOutput, exit_code: 1 },
+    tool_input: { command: "node index.js" },
+  });
+
+  if (!result.output) throw new Error("Expected loop intervention on 3rd error");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("ERROR LOOP DETECTED")) throw new Error("Missing loop detection message");
+  if (!ctx.includes("STOP")) throw new Error("Missing STOP directive");
+
+  return { detail: "Loop detected on 3rd identical error" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 15: Binary file blocking
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Read guard: blocks binary file extensions", () => {
+  const dir = createProjectDir("binary-test", {});
+  const pngPath = path.join(dir, "image.png");
+  fs.writeFileSync(pngPath, Buffer.from([0x89, 0x50, 0x4e, 0x47])); // PNG header
+
+  const result = runHook("read_guard.js", {
+    tool_name: "Read",
+    tool_input: { file_path: pngPath },
+    cwd: dir,
+  });
+
+  if (result.exitCode !== 2) throw new Error(`Expected exit code 2 (blocked), got ${result.exitCode}`);
+  if (!result.stderr.includes("binary")) throw new Error("Missing binary block message");
+
+  cleanup(dir);
+  return { detail: "Binary .png blocked with exit code 2" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // REPORT
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -583,7 +725,7 @@ test("Onboarding settings.json: deny rules cover all noisy patterns", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.0.2 — UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.2.0 — UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));

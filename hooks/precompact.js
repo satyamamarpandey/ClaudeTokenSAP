@@ -34,14 +34,19 @@ function recentDebugEvents(limit = 5) {
 
   const state = readSessionState();
 
-  // Collect session learnings to preserve across compaction
-  const learnings = [];
-
   // Track files that were read/modified
   const recentFiles = (state.recentlyReadFiles || []).slice(0, 5).map((item) => {
     const base = item.filePath ? item.filePath.split(/[\\/]/).pop() : "unknown";
     return `${base} (${item.summaryType || item.ext || "?"})`;
   });
+
+  // Track written/edited files from write_tracker
+  const modifiedFiles = (state.modifiedFiles || []).slice(-10);
+  const modifiedByCategory = {};
+  for (const f of modifiedFiles) {
+    if (!modifiedByCategory[f.category]) modifiedByCategory[f.category] = [];
+    modifiedByCategory[f.category].push(f.baseName);
+  }
 
   // Build compaction memory
   const lines = [
@@ -50,6 +55,7 @@ function recentDebugEvents(limit = 5) {
     `- prompts this session: ${state.promptCount || 0}`,
     `- blocked large reads: ${state.blockedReads || 0}`,
     `- bash outputs compressed: ${state.bashCompressCount || 0}`,
+    `- files written/edited: ${state.totalWrites || 0}`,
     `- compactions so far: ${state.compactionCount || 0}`,
   ];
 
@@ -58,7 +64,40 @@ function recentDebugEvents(limit = 5) {
   }
 
   if (recentFiles.length) {
-    lines.push("- key files touched: " + recentFiles.join(", "));
+    lines.push("- key files read: " + recentFiles.join(", "));
+  }
+
+  // Show modified files grouped by category (richer context)
+  if (Object.keys(modifiedByCategory).length > 0) {
+    lines.push("- files modified by category:");
+    for (const [cat, files] of Object.entries(modifiedByCategory)) {
+      lines.push(`  ${cat}: ${files.join(", ")}`);
+    }
+  }
+
+  // Architecture signals from write_tracker
+  const arch = state.archSignals || {};
+  const archNotes = [];
+  if (arch.depsModified) archNotes.push(`${arch.depsModified} dependency file changes`);
+  if (arch.dbModified) archNotes.push(`${arch.dbModified} DB/schema changes`);
+  if (arch.apiModified) archNotes.push(`${arch.apiModified} API route changes`);
+  if (arch.configModified) archNotes.push(`${arch.configModified} config changes`);
+  if (archNotes.length > 0) {
+    lines.push("- architecture changes: " + archNotes.join(", "));
+  }
+
+  // Detected signals from onboarding (preserve across compaction)
+  if (state.detectedSignals) {
+    const d = state.detectedSignals;
+    const parts = [];
+    if (d.appType) parts.push(`type:${d.appType}`);
+    if (d.framework) parts.push(`framework:${d.framework}`);
+    if (d.language) parts.push(`lang:${d.language}`);
+    if (d.database) parts.push(`db:${d.database}`);
+    if (d.domain) parts.push(`domain:${d.domain}`);
+    if (parts.length > 0) {
+      lines.push("- detected project context: " + parts.join(", "));
+    }
   }
 
   // Check if CLAUDE.md has been populated (not placeholder)

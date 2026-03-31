@@ -6,7 +6,7 @@
 
 <p>
   <a href="#installation"><img src="https://img.shields.io/badge/install-2%20commands-111827?style=for-the-badge" alt="Install in 2 commands"></a>
-  <a href="#whats-new-in-v202"><img src="https://img.shields.io/badge/version-v2.0.2-2563eb?style=for-the-badge" alt="Version 2.0.2"></a>
+  <a href="#whats-new-in-v220"><img src="https://img.shields.io/badge/version-v2.2.0-2563eb?style=for-the-badge" alt="Version 2.2.0"></a>
   <a href="#supported-platforms"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f766e?style=for-the-badge" alt="Windows macOS Linux"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2018-7c3aed?style=for-the-badge" alt="Node 18+"></a>
 </p>
@@ -60,9 +60,36 @@ That creates three practical problems:
 
 ---
 
-## What’s new in v2.0.2
+## What’s new in v2.2.0
 
-Version `2.0.2` brings major token optimization improvements:
+Version `2.2.0` adds token budget intelligence, error loop prevention, search compression, and duplicate read tracking:
+
+### Token budget tracking
+Estimates token consumption across all operations (reads, prompts, bash, search). Progressive warnings at 60% and 80% capacity. Strategic compaction triggers at 70% budget instead of naive prompt counting.
+
+### Error loop detection
+PostToolUse hook on Bash monitors repeated error patterns. Normalizes errors (strips timestamps, paths, numbers) and intervenes after 3 identical failures with actionable guidance to break the loop.
+
+### Search result compression
+Grep results with 40+ matches are grouped by file with match counts. Glob results are grouped by directory. Reduces search output by 60-80% while preserving the most relevant matches.
+
+### Duplicate read prevention
+Tracks every file read per session. Warns when a file has been read 3+ times. Integrates with the read guard to reduce redundant context consumption.
+
+### Binary file blocking
+Instantly blocks reads on binary files (.png, .jpg, .exe, .zip, .mp4, .pdf, .woff2, etc.) — they waste tokens and aren’t useful as text.
+
+### Structured post-compact briefing
+After compaction, injects a structured resume briefing with token budget status, efficiency metrics from all subsystems, architecture change summary, and file modification categories.
+
+### Previous (v2.1.0) improvements:
+
+- Smart prompt analysis with auto-detected defaults and contextual onboarding hints
+- Write/edit tracking categorizes every file modification
+- Follow-up gap detection on prompts 2-4
+- Enriched compaction memory with architecture signals
+
+### Previous (v2.0.2) improvements:
 
 ### Clarification gate for vague build prompts
 If a user prompt is underspecified, the plugin pushes Claude to ask focused follow-up questions **before** writing code.

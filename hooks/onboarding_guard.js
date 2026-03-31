@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { appendDebugLog, mergeSessionState, readSessionState } = require("../lib/debug-log");
+const { analyzePrompt, generateHints, formatDetectedContext } = require("../lib/prompt-analyzer");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -164,41 +165,89 @@ const ASK_RULES = [
 
   appendDebugLog("onboarding_done", { cwd, projectName, created });
 
-  // Inject BLOCKING directive — strong enough that Claude cannot skip it.
-  // additionalContext is advisory, so we use consequence-framing to force compliance.
-  const savedPrompt = prompt.slice(0, 300);
+  // ── Smart prompt analysis ──
+  const savedPrompt = prompt.slice(0, 500);
+  const detected = analyzePrompt(savedPrompt);
+  const hints = generateHints(detected);
+  const detectedSummary = formatDetectedContext(detected);
+
+  appendDebugLog("onboarding_analysis", { detected: { appType: detected.appType, framework: detected.framework, language: detected.language, database: detected.database, platform: detected.platform, domain: detected.domain }, signalCount: detected.signals.length });
+
+  // Save detected signals in session state for follow-up use
+  mergeSessionState((prev) => ({ ...prev, detectedSignals: detected, onboardingPrompt: savedPrompt }));
+
+  // ── Build smart directive with contextual hints ──
   const directive = [
     "⛔ MANDATORY ONBOARDING — DO NOT WRITE ANY CODE YET ⛔",
     "",
     "The user said: \"" + savedPrompt + "\"",
     "",
-    "You do NOT know what platform, language, or framework they want.",
-    "If you guess wrong (e.g., build a web app when they wanted mobile),",
-    "the ENTIRE session is wasted. You MUST ask first.",
+  ];
+
+  // Show what was auto-detected (if anything)
+  if (detectedSummary) {
+    directive.push(
+      "🔍 Auto-detected from prompt: " + detectedSummary,
+      "",
+      "Some answers may already be clear from the prompt. Show detected values as defaults",
+      "so the user can confirm with a quick 'yes' or correct them.",
+      ""
+    );
+  } else {
+    directive.push(
+      "No clear signals detected in the prompt. Ask all questions without defaults.",
+      ""
+    );
+  }
+
+  directive.push(
+    "YOUR ONLY RESPONSE right now must be these 5 questions.",
+    "Format each question as a numbered item with a hint line underneath.",
+    "If a value was detected, show it as `[default: X]` so the user can just confirm.",
     "",
-    "YOUR ONLY RESPONSE right now must be these 5 questions (numbered list, no preamble):",
-    "1. What type of app? (web / mobile / desktop / CLI / API / library / other)",
-    "2. Language and framework? (e.g., React+TS, Flutter, Python+FastAPI, Swift, Kotlin)",
-    "3. Target users? (developers / consumers / internal team / other)",
-    "4. Database? (PostgreSQL / MongoDB / SQLite / Firebase / none / other)",
-    "5. Any constraints? (e.g., offline-capable, no external APIs, must use specific library)",
+    "```",
+    "1. **What type of app are you building?**",
+    detected.appType
+      ? `   [detected: ${detected.appType}] — press Enter to confirm or type to change`
+      : `   ${hints.appType}`,
+    "",
+    "2. **Language and framework?**",
+    detected.framework
+      ? `   [detected: ${detected.framework}${detected.language ? " (" + detected.language + ")" : ""}] — confirm or specify`
+      : `   ${hints.framework}`,
+    "",
+    "3. **Who are the target users?**",
+    `   ${hints.users}`,
+    "",
+    "4. **Database?**",
+    detected.database
+      ? `   [detected: ${detected.database}] — confirm or correct`
+      : `   ${hints.database}`,
+    "",
+    "5. **Any constraints or preferences?**",
+    `   ${hints.constraints}`,
+    "```",
     "",
     "AFTER the user answers all 5 questions:",
     "- Use the Edit tool to update `.claude/CLAUDE.md` — replace every '(pending onboarding)' with real answers",
+    "- Add detected domain/platform info if confirmed",
     "- Keep CLAUDE.md under 20 lines, high-signal only",
-    "- THEN execute the original request: \"" + savedPrompt + "\"",
+    "- THEN execute the original request: \"" + savedPrompt.slice(0, 200) + "\"",
     "",
     "⚠️ DO NOT write code, create files, or start building until you have ALL 5 answers.",
     "⚠️ DO NOT say \"Let me help you build...\" — just ask the 5 questions immediately.",
+    "⚠️ If user answers briefly (e.g., 'yes' or '1. web, 2. react, ...'), accept defaults and proceed.",
     "",
     "Files auto-created: " + created.join(", "),
-  ].join("\n");
+  );
+
+  const directiveStr = directive.join("\n");
 
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: directive,
+        additionalContext: directiveStr,
       },
     })
   );

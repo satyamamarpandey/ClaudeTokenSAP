@@ -4,10 +4,21 @@ const {
   appendDebugLog,
   mergeSessionState,
 } = require("../lib/debug-log");
+const { recordRead } = require("../lib/dedup-tracker");
+const { addTokens } = require("../lib/token-budget");
 
 const LARGE_FILE_BYTES = 120 * 1024;
 const VERY_LARGE_FILE_BYTES = 400 * 1024;
 const LARGE_SOURCE_FILE_BYTES = 300 * 1024;
+
+const BINARY_EXTENSIONS = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".ico", ".bmp", ".webp", ".svg",
+  ".exe", ".dll", ".so", ".dylib", ".wasm", ".bin",
+  ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
+  ".mp3", ".mp4", ".wav", ".mov", ".avi", ".mkv", ".flac",
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+  ".ttf", ".otf", ".woff", ".woff2", ".eot",
+]);
 
 const NOISY_EXTENSIONS = new Set([
   ".json",
@@ -202,9 +213,37 @@ function buildGuidance(filePath, sizeBytes, ext, mode = "noisy") {
 
   const stat = fs.statSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
+  const isBinary = BINARY_EXTENSIONS.has(ext);
   const noisyType = NOISY_EXTENSIONS.has(ext) || isLikelyMinified(filePath) || isInNoisyDir(filePath);
   const sourceCodeType = SOURCE_CODE_EXTENSIONS.has(ext);
   const lockFile = isLockFile(filePath);
+
+  // Binary files are always blocked — they waste tokens and aren't useful as text
+  if (isBinary) {
+    appendDebugLog("read_guard_binary_blocked", { filePath, ext });
+    mergeSessionState((prev) => ({
+      ...prev,
+      blockedReads: (prev.blockedReads || 0) + 1,
+      lastBlockedFile: { filePath, ext, sizeBytes: stat.size, at: new Date().toISOString(), mode: "binary" },
+    }));
+    process.stderr.write(
+      `Token Optimizer blocked read on binary file (${ext}). Binary files waste tokens.\n` +
+      `Use a specialized tool or command to inspect this file type.\nFile: ${filePath}`
+    );
+    process.exit(2);
+  }
+
+  // Track this read for dedup detection
+  const dedupResult = recordRead(filePath);
+  if (dedupResult.isDuplicate) {
+    // Track token cost of the read
+    addTokens("read", stat.size);
+    appendDebugLog("read_guard_duplicate", {
+      filePath,
+      readCount: dedupResult.readCount,
+      firstReadAt: dedupResult.firstReadAt,
+    });
+  }
 
   const shouldBlockNoisy =
     lockFile ||  // lockfiles are never useful to read in full
@@ -227,9 +266,23 @@ function buildGuidance(filePath, sizeBytes, ext, mode = "noisy") {
     lockFile,
     shouldBlock,
     mode,
+    isDuplicate: dedupResult.isDuplicate,
+    readCount: dedupResult.readCount,
   });
 
   if (!shouldBlock) {
+    // Even if not blocked, warn about duplicate reads
+    if (dedupResult.isDuplicate && dedupResult.readCount >= 3) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            additionalContext: `[Token Optimizer: This file has been read ${dedupResult.readCount} times this session. Avoid re-reading — use info from prior reads.]`,
+          },
+        })
+      );
+      return;
+    }
     process.exit(0);
   }
 

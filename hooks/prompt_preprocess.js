@@ -1,4 +1,8 @@
+const fs = require("fs");
+const path = require("path");
 const { appendDebugLog, mergeSessionState, readSessionState } = require("../lib/debug-log");
+const { checkOnboardingCompleteness } = require("../lib/prompt-analyzer");
+const { addTokens, getWarning, shouldCompact } = require("../lib/token-budget");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -167,8 +171,6 @@ function tryCompressLogInPrompt(prompt) {
 
 // ── Main ───────────────────────────────────────────────────────────────
 
-const COMPACT_INTERVAL = 4; // Suggest /compact every N prompts
-
 (async () => {
   const payload = await readJsonStdin();
   const prompt = payload.prompt || "";
@@ -181,6 +183,11 @@ const COMPACT_INTERVAL = 4; // Suggest /compact every N prompts
     promptCount,
     lastPromptAt: new Date().toISOString(),
   }));
+
+  // Track prompt tokens consumed
+  if (prompt.length > 0) {
+    addTokens("prompt", prompt.length);
+  }
 
   appendDebugLog("prompt_preprocess", {
     cwd: payload.cwd,
@@ -243,16 +250,63 @@ const COMPACT_INTERVAL = 4; // Suggest /compact every N prompts
     "- Batch independent tool calls in parallel",
   );
 
-  // ── 5. Auto-compact reminder ──
-  if (promptCount > 0 && promptCount % COMPACT_INTERVAL === 0) {
-    contextLines.push(
-      "",
-      `[Token Optimizer: ${promptCount} prompts in this session. Run /compact now to free context. Tell the user: "Running /compact to optimize context."]`
-    );
-    appendDebugLog("compact_reminder", { promptCount });
+  // ── 5. Follow-up detection (prompts 2-4): check CLAUDE.md completeness ──
+  if (promptCount >= 2 && promptCount <= 4) {
+    const cwd = payload.cwd || process.cwd();
+    const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
+    try {
+      const claudeMd = fs.readFileSync(claudeMdPath, "utf8");
+      const gaps = checkOnboardingCompleteness(claudeMd);
+      if (gaps.length > 0 && !gaps.every((g) => g === "too_sparse")) {
+        const pendingFields = gaps.filter((g) => !["too_sparse", "missing", "generic_pending"].includes(g));
+        if (pendingFields.length > 0) {
+          contextLines.push(
+            "",
+            `[Token Optimizer: CLAUDE.md still has placeholder values for: ${pendingFields.join(", ")}.`,
+            "Before executing this prompt, ask the user to confirm these fields.",
+            "Format: \"I still need to know your [field] — [contextual hint]. Then I'll continue with your request.\"]"
+          );
+          appendDebugLog("followup_gaps", { gaps: pendingFields, promptCount });
+        }
+      }
+    } catch {
+      // CLAUDE.md doesn't exist yet — skip
+    }
   }
 
-  // ── 6. CLAUDE.md update reminder (every 3 prompts) ──
+  // ── 5b. Architecture tracking — inject summary of what was modified ──
+  if (promptCount >= 3) {
+    const archSignals = state.archSignals || {};
+    const archNotes = [];
+    if (archSignals.depsModified) archNotes.push(`${archSignals.depsModified} dependency changes (${archSignals.lastDepFile || "?"})`);
+    if (archSignals.dbModified) archNotes.push(`${archSignals.dbModified} DB/schema changes`);
+    if (archSignals.apiModified) archNotes.push(`${archSignals.apiModified} API route changes`);
+    if (archNotes.length > 0 && promptCount % 5 === 0) {
+      contextLines.push(
+        "",
+        `[Session architecture changes: ${archNotes.join(", ")}. Consider updating CLAUDE.md if these reflect new patterns.]`
+      );
+    }
+  }
+
+  // ── 6. Token budget warning ──
+  const budgetWarning = getWarning();
+  if (budgetWarning) {
+    contextLines.push("", `[Token Optimizer: ${budgetWarning.message}]`);
+    appendDebugLog("budget_warning", { level: budgetWarning.level, pct: budgetWarning.pct });
+  }
+
+  // ── 6b. Strategic auto-compact (budget-aware, replaces naive interval) ──
+  const compactCheck = shouldCompact();
+  if (compactCheck.should) {
+    contextLines.push(
+      "",
+      `[Token Optimizer: compaction recommended (${compactCheck.reason}). Run /compact now to free context. Tell the user: "Running /compact to optimize context."]`
+    );
+    appendDebugLog("compact_reminder", { promptCount, reason: compactCheck.reason });
+  }
+
+  // ── 7. CLAUDE.md update reminder (every 3 prompts) ──
   if (promptCount > 1 && promptCount % 3 === 0) {
     contextLines.push(
       "",
@@ -261,13 +315,21 @@ const COMPACT_INTERVAL = 4; // Suggest /compact every N prompts
     );
   }
 
-  // ── 7. Token savings tracking ──
+  // ── 8. Token savings tracking (enriched with all subsystems) ──
   const totalBlocked = state.blockedReads || 0;
   const totalCompressed = state.bashCompressCount || 0;
-  if (totalBlocked + totalCompressed > 0) {
-    contextLines.push(
-      `[Session stats: ${totalBlocked} reads blocked, ${totalCompressed} outputs compressed]`
-    );
+  const searchCompressed = state.searchCompressCount || 0;
+  const errorLoops = state.errorLoopsDetected || 0;
+  const duplicateReads = state.duplicateReads || 0;
+  const totalActions = totalBlocked + totalCompressed + searchCompressed + errorLoops + duplicateReads;
+  if (totalActions > 0) {
+    const parts = [];
+    if (totalBlocked > 0) parts.push(`${totalBlocked} reads blocked`);
+    if (totalCompressed > 0) parts.push(`${totalCompressed} bash compressed`);
+    if (searchCompressed > 0) parts.push(`${searchCompressed} searches compressed`);
+    if (errorLoops > 0) parts.push(`${errorLoops} error loops caught`);
+    if (duplicateReads > 0) parts.push(`${duplicateReads} duplicate reads`);
+    contextLines.push(`[Session stats: ${parts.join(", ")}]`);
   }
 
   if (contextLines.length > 0) {
