@@ -1,4 +1,6 @@
-const { appendDebugLog, LOG_FILE } = require("../lib/debug-log");
+const fs = require("fs");
+const path = require("path");
+const { appendDebugLog, LOG_FILE, mergeSessionState } = require("../lib/debug-log");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -43,6 +45,14 @@ function getRepoSummary(rootDir) {
   const cwd = payload.cwd || process.cwd();
   const repoSummary = getRepoSummary(cwd);
 
+  // Reset per-session flags so each new session re-evaluates onboarding
+  mergeSessionState((prev) => ({
+    ...prev,
+    onboardingAsked: false,
+  }));
+
+  const isFirstRun = !fs.existsSync(path.join(cwd, ".claude", "CLAUDE.md"));
+
   appendDebugLog("session_start", {
     cwd,
     source: payload.source,
@@ -50,6 +60,7 @@ function getRepoSummary(rootDir) {
     transcriptPath: payload.transcript_path,
     logFile: LOG_FILE,
     repoSummary,
+    isFirstRun,
   });
 
   const additionalContextLines = [
