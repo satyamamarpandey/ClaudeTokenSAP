@@ -92,7 +92,7 @@ That creates three practical problems:
 
 ## What’s new in v2.2.1
 
-Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features — token budget intelligence, error loop prevention, search compression, and duplicate read tracking.
+Version `2.2.1` fixes PreCompact/PostCompact hook schema validation and includes all v2.2.0 features - token budget intelligence, error loop prevention, search compression, and duplicate read tracking.
 
 ### Token budget tracking
 Estimates token consumption across all operations (reads, prompts, bash, search). Progressive warnings at 60% and 80% capacity. Strategic compaction triggers at 70% budget instead of naive prompt counting.
