@@ -44,19 +44,10 @@ function recentDebugEvents(limit = 5) {
   });
 
   const state = readSessionState();
-  const assumptions = state.assumptions || {};
   const recentFiles = (state.recentlyReadFiles || []).slice(0, 5).map((item) => {
     const base = item.filePath ? item.filePath.split(/[\\/]/).pop() : "unknown";
     return `- ${base} (${item.summaryType || item.ext || "unknown"})`;
   });
-
-  const assumptionLines = [];
-  if (assumptions.platform) assumptionLines.push(`- platform: ${assumptions.platform}`);
-  if (assumptions.framework) assumptionLines.push(`- framework: ${assumptions.framework}`);
-  if (assumptions.frameworkSelection) assumptionLines.push(`- framework selection: ${assumptions.frameworkSelection}`);
-  if (assumptions.featureScope) assumptionLines.push(`- feature scope: ${assumptions.featureScope}`);
-  if (Array.isArray(assumptions.ui) && assumptions.ui.length) assumptionLines.push(`- ui: ${assumptions.ui.join(", ")}`);
-  if (Array.isArray(assumptions.features) && assumptions.features.length) assumptionLines.push(`- features: ${assumptions.features.join(", ")}`);
 
   const lines = [
     "Token Optimizer pre-compact memory:",
@@ -64,11 +55,6 @@ function recentDebugEvents(limit = 5) {
     `- clarification rounds used: ${state.clarificationRounds || 0}`,
     `- blocked large reads: ${state.blockedReads || 0}`,
   ];
-
-  if (assumptionLines.length) {
-    lines.push("- active assumptions:");
-    lines.push(...assumptionLines);
-  }
 
   if (recentFiles.length) {
     lines.push("- recently read files:");

@@ -8,7 +8,6 @@ const {
 const LARGE_FILE_BYTES = 120 * 1024;
 const VERY_LARGE_FILE_BYTES = 400 * 1024;
 const LARGE_SOURCE_FILE_BYTES = 300 * 1024;
-const LARGE_LOCK_FILE_BYTES = 60 * 1024;
 
 const NOISY_EXTENSIONS = new Set([
   ".json",
@@ -22,6 +21,9 @@ const NOISY_EXTENSIONS = new Set([
   ".map",
   ".min.js",
   ".min.css",
+  ".yaml",
+  ".yml",
+  ".toml",
 ]);
 
 const SOURCE_CODE_EXTENSIONS = new Set([
@@ -205,7 +207,7 @@ function buildGuidance(filePath, sizeBytes, ext, mode = "noisy") {
   const lockFile = isLockFile(filePath);
 
   const shouldBlockNoisy =
-    (lockFile && stat.size >= LARGE_LOCK_FILE_BYTES) ||
+    lockFile ||  // lockfiles are never useful to read in full
     (noisyType && stat.size >= LARGE_FILE_BYTES) ||
     stat.size >= VERY_LARGE_FILE_BYTES;
 

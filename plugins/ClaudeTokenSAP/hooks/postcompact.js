@@ -35,7 +35,6 @@ function readJsonStdin() {
     lastCompactedAt: new Date().toISOString(),
   }));
 
-  const assumptions = nextState.assumptions || {};
   const nextStepHints = [];
   if (nextState.lastBlockedFile) {
     nextStepHints.push(`Inspect ${nextState.lastBlockedFile.filePath.split(/[\\/]/).pop()} with a targeted search or range read.`);
@@ -43,18 +42,12 @@ function readJsonStdin() {
   if (nextState.lastReadFile) {
     nextStepHints.push(`Continue from ${nextState.lastReadFile.filePath.split(/[\\/]/).pop()} if more exact detail is needed.`);
   }
-  if (assumptions.frameworkSelection === "plugin-may-choose-default" && !assumptions.framework) {
-    nextStepHints.push("Pick a sensible framework default and continue instead of re-asking.");
-  }
 
   const lines = [
     "Token Optimizer post-compact summary:",
     `- compaction count: ${nextState.compactionCount || 0}`,
     `- current task: ${nextState.currentTask || "unknown"}`,
   ];
-
-  if (assumptions.platform) lines.push(`- platform: ${assumptions.platform}`);
-  if (assumptions.framework) lines.push(`- framework: ${assumptions.framework}`);
 
   if (nextStepHints.length) {
     lines.push("- continuation hints:");

@@ -53,19 +53,21 @@ function getRepoSummary(rootDir) {
   });
 
   const additionalContextLines = [
-    "Token Optimizer session policy:",
-    "- For vague build/create/scaffold prompts, ask targeted clarification questions before writing code.",
-    "- Ask only for missing details. Skip any detail the user already provided.",
-    "- Ask at most one clarification round for a normal build request.",
-    "- If the user answers a clarification round, proceed with smart defaults unless a truly blocking detail is still missing.",
-    "- Treat phrases like `choose your own framework`, `best one`, `pick for me`, `all functions`, and `all features` as permission to select sensible defaults and continue.",
-    "- Do not ask the same category twice in a row.",
-    "- Use compact OpenCode-like numbered choices, and make the last option in each question exactly `Custom`.",
-    "- If the user clearly asks for the simplest/default version and the platform/stack is already clear, proceed without another clarification round.",
-    "- Prefer search, grep, symbol lookup, or targeted range reads before large full-file reads.",
-    "- Do not rewrite workspace files on disk just to save tokens.",
-    "- For large JSON/log/CSV/generated files, prefer targeted inspection and summaries over full-file dumps.",
-    `- Debug log file: ${LOG_FILE}`,
+    "Token Optimizer policy (apply every response):",
+    "TOOLS: Grep/Glob first → targeted Read(offset+limit) → full Read only if file <5KB",
+    "DEBUG/FIX: Grep the error text → read only the failing function/block range, not the whole file",
+    "REFACTOR: Glob to map scope → Grep for usages → targeted reads; never load whole files",
+    "BUILD: if platform/stack is absent from the prompt, ask ONE question with numbered options; proceed with defaults otherwise",
+    "TEST: read only the specific test + the function under test; skip unrelated test files",
+    "GIT: use Bash git commands only; do not read files to understand history or diff changes",
+    "EXPLAIN: Grep for the symbol definition → read that function/class block only",
+    "SEARCH: always Grep before any Read — never browse files to find a symbol",
+    "CLARIFY: ask at most once, only for the ONE detail that would change the entire approach; state a default and proceed otherwise",
+    "MULTI-STEP (build+test+improve): complete ONE bounded pass, stop, report results, wait for next instruction — do NOT loop",
+    "OUTPUT: no echoing file content back, no repeating prior explanations, stay concise",
+    "BASH OUTPUT: if a command produces many lines, extract only errors/warnings + first and last lines",
+    "CLAUDE.MD: after any task where a large file was blocked, check if the project CLAUDE.md deny-rules already cover that pattern; if not, add a minimal rule",
+    `Debug log: ${LOG_FILE}`,
   ];
 
   try {

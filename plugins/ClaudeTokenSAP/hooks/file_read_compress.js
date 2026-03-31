@@ -3,9 +3,13 @@ const path = require("path");
 const {
   appendDebugLog,
   mergeSessionState,
+  readSessionState,
 } = require("../lib/debug-log");
 
 const MAX_ANALYZE_BYTES = 250 * 1024;
+// Only summarize files larger than this — smaller files were already loaded
+// in full by the Read tool, so adding a summary on top wastes tokens.
+const MIN_SUMMARIZE_BYTES = 20 * 1024;
 
 const SOURCE_CODE_EXTENSIONS = new Set([
   ".js",
@@ -27,6 +31,10 @@ const SOURCE_CODE_EXTENSIONS = new Set([
   ".css",
   ".scss",
 ]);
+
+const YAML_EXTENSIONS = new Set([".yaml", ".yml"]);
+const TOML_EXTENSIONS = new Set([".toml"]);
+const MARKDOWN_EXTENSIONS = new Set([".md", ".mdx"]);
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -241,6 +249,40 @@ function summarizeSourceCode(text, filePath, ext) {
   ].join("\n");
 }
 
+function summarizeYaml(text, filePath) {
+  const lines = text.split(/\r?\n/);
+  const topKeys = [];
+  for (const line of lines) {
+    const match = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*):/);
+    if (match && !topKeys.includes(match[1])) topKeys.push(match[1]);
+    if (topKeys.length >= 15) break;
+  }
+  return [
+    `Token Optimizer summary for ${path.basename(filePath)}:`,
+    `- approx lines analyzed: ${lines.length}`,
+    topKeys.length ? `- top-level keys: ${topKeys.join(", ")}` : "- top-level keys: (none detected)",
+    "- Prefer targeted key or section reads instead of loading the full file.",
+  ].join("\n");
+}
+
+function summarizeMarkdown(text, filePath) {
+  const lines = text.split(/\r?\n/);
+  const headings = [];
+  for (const line of lines) {
+    const match = line.match(/^(#{1,3})\s+(.+)/);
+    if (match) headings.push(`${match[1]} ${match[2].trim()}`);
+    if (headings.length >= 12) break;
+  }
+  return [
+    `Token Optimizer summary for ${path.basename(filePath)}:`,
+    `- approx lines analyzed: ${lines.length}`,
+    headings.length
+      ? "- headings:\n" + headings.map((h) => `  ${h}`).join("\n")
+      : "- headings: none detected",
+    "- Prefer reading specific sections rather than the full document.",
+  ].join("\n");
+}
+
 function summarizeGeneric(text, filePath) {
   const lines = text.split(/\r?\n/);
   return [
@@ -264,6 +306,23 @@ function summarizeGeneric(text, filePath) {
   }
 
   const stat = fs.statSync(filePath);
+
+  // Skip summarization for small files — the Read tool already loaded the
+  // full content, so appending a summary would only add tokens, not save them.
+  if (stat.size < MIN_SUMMARIZE_BYTES) {
+    process.exit(0);
+  }
+
+  // Skip files already summarized in this session to avoid duplicate context.
+  const sessionState = readSessionState();
+  const alreadySeen = (sessionState.recentlyReadFiles || []).some(
+    (r) => r.filePath === filePath
+  );
+  if (alreadySeen) {
+    appendDebugLog("file_read_compress_dedup", { filePath });
+    process.exit(0);
+  }
+
   const ext = path.extname(filePath).toLowerCase();
 
   let text;
@@ -291,6 +350,12 @@ function summarizeGeneric(text, filePath) {
   } else if (SOURCE_CODE_EXTENSIONS.has(ext)) {
     summaryType = "source";
     summary = summarizeSourceCode(text, filePath, ext);
+  } else if (YAML_EXTENSIONS.has(ext) || TOML_EXTENSIONS.has(ext)) {
+    summaryType = "yaml";
+    summary = summarizeYaml(text, filePath);
+  } else if (MARKDOWN_EXTENSIONS.has(ext)) {
+    summaryType = "markdown";
+    summary = summarizeMarkdown(text, filePath);
   } else {
     summaryType = "generic";
     summary = summarizeGeneric(text, filePath);

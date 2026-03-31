@@ -1,6 +1,6 @@
 {
   "name": "token-optimizer",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "description": "Clarifies vague build prompts, carries forward compaction memory, summarizes source files, and protects Claude Code context by gating oversized noisy reads.",
   "author": {
     "name": "Satyam Pandey"

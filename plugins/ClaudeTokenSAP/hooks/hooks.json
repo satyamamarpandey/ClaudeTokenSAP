@@ -16,11 +16,6 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/prompt_preprocess.js\""
-          },
-          {
-            "type": "prompt",
-            "timeout": 30,
-            "prompt": "You are a build-request clarification gate for Claude Code.\n\nInput JSON:\n$ARGUMENTS\n\nYour job is to decide whether Claude should start building immediately or first ask a short clarification round.\n\nImportant scope rules:\n- If this is NOT a build request, return {\"ok\": true}.\n- A build request includes verbs like create, build, generate, scaffold, implement, start, make, or develop, combined with app, website, plugin, bot, dashboard, tool, or calculator.\n- Ask at most ONE clarification round for a normal build request.\n- If the current user message looks like an answer to earlier clarification questions, do NOT ask another full round. Proceed with smart defaults unless a truly blocking execution detail is still missing.\n- Treat phrases like \"choose your own framework\", \"best one\", \"all functions\", \"all features\", \"pick for me\", and similar wording as permission to proceed with smart defaults.\n- Do not ask the same category twice in a row.\n\nWhen to allow immediately:\n- The request already gives enough direction to build a strong first version.\n- The platform is clear and the user asks for a simple/default/basic version.\n- The user is replying to a clarification round and has narrowed the request enough to proceed.\n- The user leaves one detail open but explicitly gives permission to choose it.\n\nWhen to block and ask questions:\n- Only if the request is still missing important build-shaping details such as platform/runtime, broad scope, UI direction, or a truly blocking constraint.\n- Ask only for the missing details.\n- Ask at most 4 questions.\n- Use a compact numbered list.\n- Each question must contain short options.\n- The last option in EACH question must be exactly Custom.\n\nResponse format:\n- Return ONLY raw JSON.\n- No markdown.\n- No explanation outside JSON.\n\nIf Claude should proceed, return:\n{\"ok\": true}\n\nIf Claude should ask questions, return:\n{\"ok\": false, \"reason\": \"Do not write code yet. Ask only the missing clarification questions in a compact numbered format. Ask at most 4 questions. Each question must use short options, and the last option must be exactly Custom. Then wait for the user's reply.\"}"
           }
         ]
       }
@@ -43,6 +38,15 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/file_read_compress.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/bash_compress.js\""
           }
         ]
       }
