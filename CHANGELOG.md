@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.0.0] - 2026-03-31
+
+### Added
+- **Interactive onboarding questions.** First-run setup now asks the user 5 questions (app type, language/framework, target users, database needs, constraints) before proceeding. Answers are written into `.claude/CLAUDE.md` via the Edit tool. No more auto-inference.
+- **Prompt counting and auto-compact.** Session state tracks prompt count. Every 4 prompts, a `/compact` reminder is injected automatically to keep context lean.
+- **Response optimization directives.** Every prompt now injects concise-output rules: no preambles, no echoing, no filler, code-only when appropriate, parallel tool calls enforced.
+- **JSON→CSV conversion.** Flat JSON arrays in user prompts are detected and the hook advises Claude to treat them as CSV for token savings.
+- **Nested JSON summarization.** Large nested JSON in prompts gets a schema+sample summary directive instead of full parsing.
+- **Log output detection.** Large log/command output in prompts triggers head+tail+errors summary guidance.
+- **Progressive CLAUDE.md updates.** Pre-compact and post-compact hooks now instruct Claude to update `.claude/CLAUDE.md` with any new project information learned during the session.
+- **Stack auto-detection.** SessionStart hook detects project stack from manifest files (package.json, Cargo.toml, go.mod, etc.) and injects it into context.
+- **Ask rules for media files.** Settings.json now includes ask-before-read rules for images, videos, and audio files instead of flat deny.
+- **Session efficiency metrics.** Post-compact summary shows total savings actions (blocked reads, compressed outputs, compactions).
+- **Expanded deny rules.** Added `.git/**`, `*.min.css`, `*.wasm`, `*.pb` to default deny list.
+
+### Changed
+- **Onboarding guard rewritten.** Creates a placeholder CLAUDE.md immediately (prevents re-triggering), then injects a directive for Claude to ask questions and update the file with real answers.
+- **SessionStart policy restructured.** Organized into clear sections (SEARCH FIRST, CONCISE OUTPUT, TASK-SPECIFIC, EFFICIENCY, CONTEXT MANAGEMENT) for better adherence.
+- **Prompt preprocessor now runs on every prompt.** Previously only activated for prompts >3000 chars. Now injects response optimization rules on every turn.
+
+### Target
+- **70% token savings per session** through combined effects of: concise output rules, auto-compact, blocked reads, compressed bash output, JSON→CSV conversion, and targeted-read enforcement.
+
+---
+
 ## [1.9.0] - 2026-03-30
 
 ### Fixed

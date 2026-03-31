@@ -14,41 +14,6 @@ function readJsonStdin() {
   });
 }
 
-function inferProject(prompt, cwd) {
-  const p = prompt.toLowerCase();
-  const name = path.basename(cwd) || "Project";
-
-  if (/\b(website|web app|webapp|frontend|react|next\.?js|vue|svelte|dashboard|landing page|portfolio)\b/.test(p)) {
-    return { name, type: "Web app", stack: "Next.js", users: "Web users" };
-  }
-  if (/\b(api|backend|server|rest|graphql|endpoint|microservice)\b/.test(p)) {
-    return { name, type: "API / backend service", stack: "Node.js", users: "API consumers" };
-  }
-  if (/\b(calculator|calc|converter|formatter|tool|utility)\b/.test(p)) {
-    return { name, type: "Utility tool", stack: "Node.js", users: "End users" };
-  }
-  if (/\b(cli|command.?line|terminal|script|automation)\b/.test(p)) {
-    return { name, type: "CLI tool", stack: "Node.js", users: "Developers" };
-  }
-  if (/\b(game|puzzle|quiz|trivia)\b/.test(p)) {
-    return { name, type: "Browser game", stack: "HTML5 / JavaScript", users: "Players" };
-  }
-  if (/\b(mobile|ios|android|react native|flutter)\b/.test(p)) {
-    return { name, type: "Mobile app", stack: "React Native", users: "Mobile users" };
-  }
-  if (/\b(chat|chatbot|bot|assistant|ai)\b/.test(p)) {
-    return { name, type: "AI chat interface", stack: "Next.js + AI SDK", users: "End users" };
-  }
-  if (/\b(blog|cms|content|store|shop|e-?commerce)\b/.test(p)) {
-    return { name, type: "Content / e-commerce site", stack: "Next.js", users: "Customers" };
-  }
-  if (/\b(database|schema|migration|model|orm)\b/.test(p)) {
-    return { name, type: "Data layer", stack: "Node.js + PostgreSQL", users: "Developers" };
-  }
-
-  return { name, type: "Application", stack: "Node.js", users: "Developers" };
-}
-
 const DENY_RULES = [
   "Read(node_modules/**)",
   "Read(dist/**)",
@@ -61,7 +26,22 @@ const DENY_RULES = [
   "Read(**/*.lock)",
   "Read(**/*.log)",
   "Read(**/*.map)",
-  "Read(**/*.min.js)"
+  "Read(**/*.min.js)",
+  "Read(**/*.min.css)",
+  "Read(.git/**)",
+  "Read(**/*.wasm)",
+  "Read(**/*.pb)",
+];
+
+const ASK_RULES = [
+  "Read(**/*.png)",
+  "Read(**/*.jpg)",
+  "Read(**/*.jpeg)",
+  "Read(**/*.gif)",
+  "Read(**/*.svg)",
+  "Read(**/*.mp4)",
+  "Read(**/*.mp3)",
+  "Read(**/*.wav)",
 ];
 
 (async () => {
@@ -69,9 +49,11 @@ const DENY_RULES = [
   const cwd = payload.cwd || process.cwd();
   const prompt = payload.prompt || "";
 
-  const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
+  const claudeDir = path.join(cwd, ".claude");
+  const claudeMdPath = path.join(claudeDir, "CLAUDE.md");
+  const settingsPath = path.join(claudeDir, "settings.json");
 
-  // Skip if already onboarded
+  // Skip if already onboarded (CLAUDE.md exists)
   if (fs.existsSync(claudeMdPath)) {
     appendDebugLog("onboarding_skip", { reason: "CLAUDE.md exists", cwd });
     process.exit(0);
@@ -86,42 +68,52 @@ const DENY_RULES = [
 
   mergeSessionState((prev) => ({ ...prev, onboardingDone: true }));
 
-  const project = inferProject(prompt, cwd);
-  const claudeDir = path.join(cwd, ".claude");
-  const created = [];
+  const projectName = path.basename(cwd) || "Project";
 
-  // Ensure .claude/ exists
+  // Create .claude/ directory
   try { fs.mkdirSync(claudeDir, { recursive: true }); } catch {}
 
-  // Write CLAUDE.md
-  const claudeMd = [
-    `# ${project.name}`,
-    `Building: ${project.type}`,
-    `Stack: ${project.stack}`,
-    `Users: ${project.users}`,
-    ``,
-    `# AI strategy`,
-    `Use Haiku for simple tasks; Sonnet for main development work.`,
-    `Keep context low: Grep before Read, targeted reads only, no whole-file loads.`,
-    ``,
-    `# Rules`,
-    `Concise responses. No overengineering. No unrequested extras.`,
+  // Create a minimal placeholder CLAUDE.md so the hook won't re-trigger
+  // Claude will update this with real answers after asking questions
+  const placeholderMd = [
+    `# ${projectName}`,
+    "",
+    "<!-- Token Optimizer: onboarding in progress — Claude will update this file -->",
+    "",
+    "## Project Info",
+    "- Type: (pending onboarding)",
+    "- Platform: (pending onboarding)",
+    "- Language: (pending onboarding)",
+    "- Target Users: (pending onboarding)",
+    "- Database: (pending onboarding)",
+    "",
+    "## AI Strategy",
+    "- Use Haiku for simple tasks, Sonnet for main development",
+    "- Keep context low: Grep before Read, targeted reads only",
+    "- Concise responses, no overengineering, no unrequested extras",
+    "",
   ].join("\n");
 
+  const created = [];
+
   try {
-    fs.writeFileSync(claudeMdPath, claudeMd, "utf8");
+    fs.writeFileSync(claudeMdPath, placeholderMd, "utf8");
     created.push(".claude/CLAUDE.md");
   } catch (e) {
     appendDebugLog("onboarding_error", { file: "CLAUDE.md", error: e.message });
   }
 
-  // Write settings.json (only if not present)
-  const settingsPath = path.join(claudeDir, "settings.json");
+  // Write settings.json with deny + ask rules
   if (!fs.existsSync(settingsPath)) {
     try {
       fs.writeFileSync(
         settingsPath,
-        JSON.stringify({ permissions: { deny: DENY_RULES } }, null, 2),
+        JSON.stringify({
+          permissions: {
+            deny: DENY_RULES,
+            ask: ASK_RULES,
+          },
+        }, null, 2),
         "utf8"
       );
       created.push(".claude/settings.json");
@@ -130,23 +122,37 @@ const DENY_RULES = [
     }
   }
 
-  appendDebugLog("onboarding_done", { cwd, project, created });
+  appendDebugLog("onboarding_done", { cwd, projectName, created });
 
-  if (created.length > 0) {
-    const lines = [
-      "First-run project setup complete:",
-      ...created.map((f) => `  \u2713 ${f}`),
-      `  Project: ${project.type} (${project.stack})`,
-      "",
-      "Proceed with the original request immediately. Do not mention these files.",
-    ];
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "UserPromptSubmit",
-          additionalContext: lines.join("\n"),
-        },
-      })
-    );
-  }
+  // Inject directive telling Claude to ask onboarding questions
+  // and then update CLAUDE.md using the Edit tool
+  const directive = [
+    "IMPORTANT — First-run onboarding required. Before doing ANYTHING else:",
+    "",
+    "1. Ask the user these questions in a SINGLE concise message (numbered list):",
+    "   a) What are you building? (web app / mobile app / tablet app / watch app / CLI / API / game / other)",
+    "   b) What language and framework? (e.g., React+TypeScript, Python+FastAPI, Flutter, etc.)",
+    "   c) Who are the target users? (e.g., developers, consumers, internal team)",
+    "   d) Do you need a database? If yes, which? (PostgreSQL, MongoDB, SQLite, none, etc.)",
+    "   e) Any key constraints or preferences? (e.g., must be offline-capable, no external APIs)",
+    "",
+    "2. After the user answers, use the Edit tool to update `.claude/CLAUDE.md`:",
+    "   - Replace '(pending onboarding)' placeholders with real answers",
+    "   - Keep the file SHORT — max 15 lines of content",
+    "   - Do NOT add verbose descriptions or long explanations",
+    "",
+    "3. Then proceed with the user's original request: " + prompt.slice(0, 200),
+    "",
+    "Keep the questions SHORT. Do not explain why you're asking. Just ask.",
+    "Files created: " + created.join(", "),
+  ].join("\n");
+
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext: directive,
+      },
+    })
+  );
 })();
