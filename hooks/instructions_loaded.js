@@ -48,7 +48,7 @@ function getRepoSummary(rootDir) {
   // Reset per-session flags so each new session re-evaluates onboarding
   mergeSessionState((prev) => ({
     ...prev,
-    onboardingAsked: false,
+    onboardingDone: false,
   }));
 
   const isFirstRun = !fs.existsSync(path.join(cwd, ".claude", "CLAUDE.md"));
