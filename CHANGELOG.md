@@ -10,9 +10,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - **Flow: Claude no longer goes silent after onboarding.** Added "ALWAYS produce visible output" directive to response rules, session banner, and onboarding. Claude now always shows visible text the user can read without pressing Ctrl+O.
 - **Flow: Claude announces completion instead of looping.** Added explicit "Done. [summary]. Ready to test." completion signal to verification guard, response rules, and onboarding directive. Claude stops after announcing, no more incubating/precipitating loops.
-- **Flow: follow-up gap detection is non-blocking.** Previously, prompts 2-4 told Claude to "ask the user to confirm fields BEFORE executing" — this stalled the flow. Now it's a non-blocking note: "fill these in when convenient, do NOT block the current request."
+- **Flow: follow-up gap detection is non-blocking.** Previously, prompts 2-4 told Claude to "ask the user to confirm fields BEFORE executing" - this stalled the flow. Now it's a non-blocking note: "fill these in when convenient, do NOT block the current request."
 - **Flow: CLAUDE.md update reminder reduced.** Changed from every 3 prompts to every 5 to reduce directive noise that contributed to looping.
-- **Flow: compact reminder made non-blocking.** Changed from "Run /compact NOW" to "After completing the current task, suggest /compact" — no longer interrupts active work.
+- **Flow: compact reminder made non-blocking.** Changed from "Run /compact NOW" to "After completing the current task, suggest /compact" - no longer interrupts active work.
 - **Session banner: added FLOW CONTROL section.** Explicit rules for post-onboarding announcement, task completion, no re-verification loops, and always-visible output.
 
 ---

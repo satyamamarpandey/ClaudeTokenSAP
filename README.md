@@ -96,16 +96,16 @@ That creates three practical problems:
 Version `2.3.1` fixes the flow issues where Claude goes silent after onboarding, loops indefinitely instead of announcing completion, and requires Ctrl+O to see responses.
 
 ### Flow control fixes
-- **Visible output mandate**: All hooks now inject "ALWAYS produce visible text output" — Claude never goes silent.
+- **Visible output mandate**: All hooks now inject "ALWAYS produce visible text output" - Claude never goes silent.
 - **Completion signal**: Verification guard, response rules, and onboarding all instruct Claude to say "Done. [summary]. Ready to test." then STOP.
 - **Non-blocking follow-ups**: Follow-up gap detection (prompts 2-4) no longer blocks the user’s request. Changed from "ask before executing" to "fill in when convenient."
 - **Reduced directive noise**: CLAUDE.md reminders changed from every 3 prompts to every 5. Compact reminder deferred to after current task. Session banner has explicit FLOW CONTROL section.
 
 ### Previous (v2.3.0) additions
-- **Verification Before Completion** — Stop hook enforces evidence-based verification.
-- **Systematic Debugging (4-phase)** — Error loop guard injects root cause → pattern → hypothesis → fix protocol.
-- **Model Selection, Parallel Dispatch, TDD** — Session banner rules for cost optimization and quality.
-- **Deferred onboarding file creation** — No leftover files on API failure.
+- **Verification Before Completion** - Stop hook enforces evidence-based verification.
+- **Systematic Debugging (4-phase)** - Error loop guard injects root cause → pattern → hypothesis → fix protocol.
+- **Model Selection, Parallel Dispatch, TDD** - Session banner rules for cost optimization and quality.
+- **Deferred onboarding file creation** - No leftover files on API failure.
 
 ### Previous (v2.2.x) improvements
 
