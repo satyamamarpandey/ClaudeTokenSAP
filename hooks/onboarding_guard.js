@@ -122,29 +122,76 @@ const ASK_RULES = [
     }
   }
 
+  // Create .claudeignore for file-discovery-level blocking
+  const claudeIgnorePath = path.join(cwd, ".claudeignore");
+  if (!fs.existsSync(claudeIgnorePath)) {
+    try {
+      fs.writeFileSync(claudeIgnorePath, [
+        "# Token Optimizer — auto-generated .claudeignore",
+        "# Blocks noisy directories and files from Claude Code indexing",
+        "",
+        "node_modules/",
+        "dist/",
+        "build/",
+        ".next/",
+        "coverage/",
+        ".turbo/",
+        "vendor/",
+        "out/",
+        ".git/",
+        ".cache/",
+        ".parcel-cache/",
+        "__pycache__/",
+        "target/",
+        "",
+        "# Large/binary files",
+        "*.lock",
+        "*.log",
+        "*.map",
+        "*.min.js",
+        "*.min.css",
+        "*.wasm",
+        "*.pb",
+        "*.tsbuildinfo",
+        "*.pyc",
+        "*.class",
+      ].join("\n"), "utf8");
+      created.push(".claudeignore");
+    } catch (e) {
+      appendDebugLog("onboarding_error", { file: ".claudeignore", error: e.message });
+    }
+  }
+
   appendDebugLog("onboarding_done", { cwd, projectName, created });
 
-  // Inject directive telling Claude to ask onboarding questions
-  // and then update CLAUDE.md using the Edit tool
+  // Inject BLOCKING directive — strong enough that Claude cannot skip it.
+  // additionalContext is advisory, so we use consequence-framing to force compliance.
+  const savedPrompt = prompt.slice(0, 300);
   const directive = [
-    "IMPORTANT — First-run onboarding required. Before doing ANYTHING else:",
+    "⛔ MANDATORY ONBOARDING — DO NOT WRITE ANY CODE YET ⛔",
     "",
-    "1. Ask the user these questions in a SINGLE concise message (numbered list):",
-    "   a) What are you building? (web app / mobile app / tablet app / watch app / CLI / API / game / other)",
-    "   b) What language and framework? (e.g., React+TypeScript, Python+FastAPI, Flutter, etc.)",
-    "   c) Who are the target users? (e.g., developers, consumers, internal team)",
-    "   d) Do you need a database? If yes, which? (PostgreSQL, MongoDB, SQLite, none, etc.)",
-    "   e) Any key constraints or preferences? (e.g., must be offline-capable, no external APIs)",
+    "The user said: \"" + savedPrompt + "\"",
     "",
-    "2. After the user answers, use the Edit tool to update `.claude/CLAUDE.md`:",
-    "   - Replace '(pending onboarding)' placeholders with real answers",
-    "   - Keep the file SHORT — max 15 lines of content",
-    "   - Do NOT add verbose descriptions or long explanations",
+    "You do NOT know what platform, language, or framework they want.",
+    "If you guess wrong (e.g., build a web app when they wanted mobile),",
+    "the ENTIRE session is wasted. You MUST ask first.",
     "",
-    "3. Then proceed with the user's original request: " + prompt.slice(0, 200),
+    "YOUR ONLY RESPONSE right now must be these 5 questions (numbered list, no preamble):",
+    "1. What type of app? (web / mobile / desktop / CLI / API / library / other)",
+    "2. Language and framework? (e.g., React+TS, Flutter, Python+FastAPI, Swift, Kotlin)",
+    "3. Target users? (developers / consumers / internal team / other)",
+    "4. Database? (PostgreSQL / MongoDB / SQLite / Firebase / none / other)",
+    "5. Any constraints? (e.g., offline-capable, no external APIs, must use specific library)",
     "",
-    "Keep the questions SHORT. Do not explain why you're asking. Just ask.",
-    "Files created: " + created.join(", "),
+    "AFTER the user answers all 5 questions:",
+    "- Use the Edit tool to update `.claude/CLAUDE.md` — replace every '(pending onboarding)' with real answers",
+    "- Keep CLAUDE.md under 20 lines, high-signal only",
+    "- THEN execute the original request: \"" + savedPrompt + "\"",
+    "",
+    "⚠️ DO NOT write code, create files, or start building until you have ALL 5 answers.",
+    "⚠️ DO NOT say \"Let me help you build...\" — just ask the 5 questions immediately.",
+    "",
+    "Files auto-created: " + created.join(", "),
   ].join("\n");
 
   process.stdout.write(

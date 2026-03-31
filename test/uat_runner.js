@@ -230,13 +230,21 @@ test("Onboarding: triggers on fresh project (no CLAUDE.md)", () => {
 
   if (!result.output) throw new Error("No output — onboarding should trigger");
   const ctx = result.output.hookSpecificOutput.additionalContext;
-  if (!ctx.includes("First-run onboarding required")) throw new Error("Missing onboarding directive");
-  if (!ctx.includes("What are you building")) throw new Error("Missing questions");
+  if (!ctx.includes("MANDATORY ONBOARDING")) throw new Error("Missing blocking onboarding directive");
+  if (!ctx.includes("DO NOT WRITE ANY CODE")) throw new Error("Missing code-blocking language");
+  if (!ctx.includes("What type of app")) throw new Error("Missing question 1 (app type)");
+  if (!ctx.includes("Language and framework")) throw new Error("Missing question 2 (language)");
   if (!ctx.includes("todo app")) throw new Error("Missing original prompt passthrough");
 
   // Verify it created .claude/CLAUDE.md
   if (!fs.existsSync(path.join(dir, ".claude", "CLAUDE.md"))) throw new Error("CLAUDE.md not created");
   if (!fs.existsSync(path.join(dir, ".claude", "settings.json"))) throw new Error("settings.json not created");
+  if (!fs.existsSync(path.join(dir, ".claudeignore"))) throw new Error(".claudeignore not created");
+
+  // Verify .claudeignore has key patterns
+  const ignoreContent = fs.readFileSync(path.join(dir, ".claudeignore"), "utf8");
+  if (!ignoreContent.includes("node_modules/")) throw new Error(".claudeignore missing node_modules/");
+  if (!ignoreContent.includes("dist/")) throw new Error(".claudeignore missing dist/");
 
   // Verify settings.json has deny + ask rules
   const settings = JSON.parse(fs.readFileSync(path.join(dir, ".claude", "settings.json"), "utf8"));
@@ -244,7 +252,7 @@ test("Onboarding: triggers on fresh project (no CLAUDE.md)", () => {
   if (!settings.permissions?.ask?.length) throw new Error("No ask rules in settings.json");
 
   cleanup(dir);
-  return { detail: `Onboarding triggered, CLAUDE.md + settings.json created, ${settings.permissions.deny.length} deny + ${settings.permissions.ask.length} ask rules` };
+  return { detail: `Onboarding triggered, CLAUDE.md + settings.json + .claudeignore created, ${settings.permissions.deny.length} deny + ${settings.permissions.ask.length} ask rules` };
 });
 
 test("Onboarding: skips when CLAUDE.md already exists", () => {

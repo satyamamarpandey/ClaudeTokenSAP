@@ -252,7 +252,16 @@ const COMPACT_INTERVAL = 4; // Suggest /compact every N prompts
     appendDebugLog("compact_reminder", { promptCount });
   }
 
-  // ── 6. Token savings tracking ──
+  // ── 6. CLAUDE.md update reminder (every 3 prompts) ──
+  if (promptCount > 1 && promptCount % 3 === 0) {
+    contextLines.push(
+      "",
+      "[Token Optimizer: Check if you learned any new project facts this cycle (new dependency, pattern, decision).",
+      "If yes, append 1-2 lines to .claude/CLAUDE.md. If no new facts, skip. Keep CLAUDE.md under 30 lines.]"
+    );
+  }
+
+  // ── 7. Token savings tracking ──
   const totalBlocked = state.blockedReads || 0;
   const totalCompressed = state.bashCompressCount || 0;
   if (totalBlocked + totalCompressed > 0) {

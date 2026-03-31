@@ -110,8 +110,14 @@ function detectStack(rootDir) {
     "- Large JSON: convert flat arrays to CSV, summarize nested objects",
     "- Never repeat prior explanations or re-read already-read files",
     "",
+    "CLAUDE.MD AS SOURCE OF TRUTH:",
+    "- ALWAYS read .claude/CLAUDE.md BEFORE starting any task — it has project context",
+    "- Use CLAUDE.md for stack, platform, users, constraints — do NOT rescan the codebase for info already recorded",
+    "- After EVERY task: check if you learned new project facts (new dependency, architecture decision, API pattern)",
+    "  If yes, append 1-2 lines to CLAUDE.md using the Edit tool. Keep it under 30 lines total.",
+    "- If CLAUDE.md still has '(pending onboarding)' placeholders, ask the user to fill them in BEFORE proceeding",
+    "",
     "CONTEXT MANAGEMENT:",
-    "- After task completion, update .claude/CLAUDE.md if new project info was learned",
     "- /compact will be suggested every 4 prompts automatically",
   ];
 
