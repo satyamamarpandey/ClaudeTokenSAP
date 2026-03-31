@@ -18,7 +18,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.0.0] - 2026-03-31
+## [2.0.1] - 2026-03-31
 
 ### Added
 - **Interactive onboarding questions.** First-run setup now asks the user 5 questions (app type, language/framework, target users, database needs, constraints) before proceeding. Answers are written into `.claude/CLAUDE.md` via the Edit tool. No more auto-inference.

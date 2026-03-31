@@ -6,4 +6,4 @@ node_modules/
 Thumbs.db
 dist/
 temp/
-.claude/.onboarding_complete
+.claude/
