@@ -202,6 +202,7 @@ function emit(directiveStr) {
   const constraints = (answers.constraints === "None") ? "None" : (answers.constraints || "None");
 
   const settingsContent = JSON.stringify({
+    model: "opusplan",
     permissions: { deny: DENY_RULES, ask: ASK_RULES },
   }, null, 2);
 

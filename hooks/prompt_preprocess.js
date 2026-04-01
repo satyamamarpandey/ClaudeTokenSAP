@@ -3,6 +3,7 @@ const path = require("path");
 const { appendDebugLog, mergeSessionState, readSessionState } = require("../lib/debug-log");
 const { checkOnboardingCompleteness } = require("../lib/prompt-analyzer");
 const { addTokens, getWarning, shouldCompact } = require("../lib/token-budget");
+const { estimateTranscriptTokens } = require("../lib/transcript-tracker");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -291,21 +292,58 @@ function tryCompressLogInPrompt(prompt) {
     }
   }
 
-  // ── 6. Token budget warning ──
+  // ── 6. Transcript-based input/output token tracking ──
+  const transcriptPath = payload.transcript_path || null;
+  const transcriptStats = estimateTranscriptTokens(transcriptPath);
+
+  let transcriptInputTokens = 0;
+  let transcriptOutputTokens = 0;
+  if (transcriptStats) {
+    transcriptInputTokens = transcriptStats.inputTokens;
+    transcriptOutputTokens = transcriptStats.outputTokens;
+    const totalTranscript = transcriptStats.totalTokens;
+    const pctOfBudget = Math.round((totalTranscript / 200000) * 100);
+    contextLines.push(
+      "",
+      `[Token Optimizer] Session tokens: ~${transcriptInputTokens.toLocaleString()} input / ~${transcriptOutputTokens.toLocaleString()} output / ~${totalTranscript.toLocaleString()} total (${pctOfBudget}% of 200k budget)`
+    );
+    appendDebugLog("transcript_tokens", { transcriptInputTokens, transcriptOutputTokens, totalTranscript, pctOfBudget });
+  }
+
+  // ── 6b. Token budget warning (heuristic budget as fallback) ──
   const budgetWarning = getWarning();
   if (budgetWarning) {
     contextLines.push("", `[Token Optimizer: ${budgetWarning.message}]`);
     appendDebugLog("budget_warning", { level: budgetWarning.level, pct: budgetWarning.pct });
   }
 
-  // ── 6b. Strategic auto-compact (budget-aware, replaces naive interval) ──
+  // ── 6c. Auto-compact: forceful when budget is high ──
+  // Uses transcript token count if available (more accurate), falls back to heuristic.
+  const transcriptPct = transcriptStats
+    ? transcriptStats.totalTokens / 200000
+    : 0;
   const compactCheck = shouldCompact();
-  if (compactCheck.should) {
-    contextLines.push(
-      "",
-      `[Token Optimizer: context getting large (${compactCheck.reason}). After completing the current task, suggest /compact to the user.]`
-    );
-    appendDebugLog("compact_reminder", { promptCount, reason: compactCheck.reason });
+  const needsCompact = transcriptPct >= 0.7 || compactCheck.should;
+
+  if (needsCompact) {
+    const reason = transcriptStats
+      ? `context at ~${Math.round(transcriptPct * 100)}% (${transcriptStats.totalTokens.toLocaleString()} / 200k tokens)`
+      : compactCheck.reason;
+
+    if (transcriptPct >= 0.85 || (transcriptStats && transcriptStats.totalTokens >= 160000)) {
+      // Critical: instruct Claude to demand /compact before answering
+      contextLines.push(
+        "",
+        `⚠️ TOKEN BUDGET CRITICAL (${reason}): BEFORE answering this prompt, output ONLY: "Context is ${Math.round(transcriptPct * 100)}% full. Please run /compact now, then I'll continue." Then STOP and wait. Do NOT answer the user's question until after they run /compact.`
+      );
+    } else {
+      // High: finish current task, then immediately prompt for /compact
+      contextLines.push(
+        "",
+        `[Token Optimizer: ${reason}. After your response, tell the user: "Run /compact now to keep the session efficient."]`
+      );
+    }
+    appendDebugLog("compact_triggered", { reason, transcriptPct: Math.round(transcriptPct * 100) });
   }
 
   // ── 7. CLAUDE.md update reminder (every 5 prompts - low frequency to avoid looping) ──
@@ -330,7 +368,7 @@ function tryCompressLogInPrompt(prompt) {
     if (searchCompressed > 0) parts.push(`${searchCompressed} searches compressed`);
     if (errorLoops > 0) parts.push(`${errorLoops} error loops caught`);
     if (duplicateReads > 0) parts.push(`${duplicateReads} duplicate reads`);
-    contextLines.push(`[Session stats: ${parts.join(", ")}]`);
+    contextLines.push(`[Session savings: ${parts.join(", ")}]`);
   }
 
   if (contextLines.length > 0) {

@@ -210,7 +210,7 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 
     if (!result.output) throw new Error("No output from SessionStart hook");
     const ctx = result.output.hookSpecificOutput.additionalContext;
-    if (!ctx.includes("TOKEN OPTIMIZER v2.3.1")) throw new Error("Missing version header");
+    if (!ctx.includes("TOKEN OPTIMIZER v2.3.2")) throw new Error("Missing version header");
     if (!ctx.includes("MANDATORY RULES")) throw new Error("Missing mandatory rules");
     if (!ctx.includes("SEARCH FIRST")) throw new Error("Missing SEARCH FIRST section");
     if (!ctx.includes("CONCISE OUTPUT")) throw new Error("Missing CONCISE OUTPUT section");
@@ -645,6 +645,109 @@ test("Dedup tracker: detects duplicate file reads", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// TEST SUITE 12b: Transcript token tracking
+// ═══════════════════════════════════════════════════════════════════════
+
+test("Transcript tracker: parses JSONL transcript and separates input/output tokens", () => {
+  const { estimateTranscriptTokens } = require("../lib/transcript-tracker");
+
+  // Create a synthetic JSONL transcript
+  const dir = createProjectDir("transcript-test", {});
+  const transcriptPath = path.join(dir, "session.jsonl");
+  const lines = [
+    JSON.stringify({ role: "user", content: "Build me a todo app with React and TypeScript" }),
+    JSON.stringify({ role: "assistant", content: "I'll build that for you. Here's the component structure..." }),
+    JSON.stringify({ role: "user", content: [{ type: "text", text: "Add dark mode support" }] }),
+    JSON.stringify({ role: "assistant", content: [{ type: "text", text: "Done. Added dark mode toggle." }] }),
+  ];
+  fs.writeFileSync(transcriptPath, lines.join("\n"), "utf8");
+
+  const stats = estimateTranscriptTokens(transcriptPath);
+  if (!stats) throw new Error("Expected stats object, got null");
+  if (stats.inputTokens === 0) throw new Error("Expected non-zero input tokens");
+  if (stats.outputTokens === 0) throw new Error("Expected non-zero output tokens");
+  if (stats.inputMessages !== 2) throw new Error(`Expected 2 input messages, got ${stats.inputMessages}`);
+  if (stats.outputMessages !== 2) throw new Error(`Expected 2 output messages, got ${stats.outputMessages}`);
+  if (stats.totalTokens !== stats.inputTokens + stats.outputTokens) throw new Error("Total should equal input + output");
+
+  cleanup(dir);
+  return { detail: `input=${stats.inputTokens} tokens, output=${stats.outputTokens} tokens, total=${stats.totalTokens}` };
+});
+
+test("Transcript tracker: returns null for missing transcript file", () => {
+  const { estimateTranscriptTokens } = require("../lib/transcript-tracker");
+  const result = estimateTranscriptTokens("/nonexistent/path/session.jsonl");
+  if (result !== null) throw new Error("Expected null for missing file");
+  return { detail: "Gracefully returns null for missing transcript" };
+});
+
+test("PromptPreprocess: shows input/output token stats from transcript", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  // Create a synthetic transcript with some content
+  const dir = createProjectDir("transcript-stats-test", {});
+  const transcriptPath = path.join(dir, "session.jsonl");
+  const assistantText = "x".repeat(4000); // ~1000 output tokens
+  const userText = "y".repeat(2000);       // ~500 input tokens
+  const lines = [
+    JSON.stringify({ role: "user", content: userText }),
+    JSON.stringify({ role: "assistant", content: assistantText }),
+  ];
+  fs.writeFileSync(transcriptPath, lines.join("\n"), "utf8");
+
+  const result = runHook("prompt_preprocess.js", {
+    cwd: dir,
+    prompt: "add a feature",
+    transcript_path: transcriptPath,
+  });
+
+  if (!result.output) throw new Error("No output from prompt_preprocess");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+
+  if (!ctx.includes("input")) throw new Error("Missing input token count");
+  if (!ctx.includes("output")) throw new Error("Missing output token count");
+  if (!ctx.includes("total")) throw new Error("Missing total token count");
+  if (!ctx.includes("budget")) throw new Error("Missing budget percentage");
+
+  cleanup(dir);
+  return { detail: "Token stats (input/output/total) shown in prompt context" };
+});
+
+test("PromptPreprocess: critical compact fires at 85%+ token budget", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
+  // Create a very large synthetic transcript (~85% of 200k = 170k tokens = 680k chars)
+  const dir = createProjectDir("compact-critical-test", {});
+  const transcriptPath = path.join(dir, "session.jsonl");
+  const bigContent = "a".repeat(400000); // ~100k tokens user side
+  const bigResponse = "b".repeat(280000); // ~70k tokens assistant side  → total ~170k tokens = 85%
+  const lines = [
+    JSON.stringify({ role: "user", content: bigContent }),
+    JSON.stringify({ role: "assistant", content: bigResponse }),
+  ];
+  fs.writeFileSync(transcriptPath, lines.join("\n"), "utf8");
+
+  const result = runHook("prompt_preprocess.js", {
+    cwd: dir,
+    prompt: "next task",
+    transcript_path: transcriptPath,
+  });
+
+  if (!result.output) throw new Error("No output");
+  const ctx = result.output.hookSpecificOutput.additionalContext;
+
+  // Should have critical compact directive
+  if (!ctx.includes("TOKEN BUDGET CRITICAL") && !ctx.includes("compact")) {
+    throw new Error("Expected critical compact directive at 85%+ budget");
+  }
+
+  cleanup(dir);
+  return { detail: "Critical compact directive fires at 85%+ token budget" };
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // TEST SUITE 13: Search compression
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1019,7 +1122,7 @@ test("Flow: CLAUDE.md reminder frequency reduced (every 5, not 3)", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.3.1 - UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.3.2 - UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));

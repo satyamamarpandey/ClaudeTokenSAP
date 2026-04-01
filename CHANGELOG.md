@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.3.1] - 2026-03-31
+## [2.3.2] - 2026-03-31
 
 ### Fixed
 - **Flow: Claude no longer goes silent after onboarding.** Added "ALWAYS produce visible output" directive to response rules, session banner, and onboarding. Claude now always shows visible text the user can read without pressing Ctrl+O.
