@@ -8,7 +8,7 @@
 <p>
   <a href="#installation"><img src="https://img.shields.io/badge/install-2%20commands-111827?style=for-the-badge" alt="Install in 2 commands"></a>
   <a href="#why-teams-use-it"><img src="https://img.shields.io/badge/token%20focus-context%20efficiency-16a34a?style=for-the-badge" alt="Context efficiency"></a>
-  <a href="#whats-new-in-v232"><img src="https://img.shields.io/badge/version-v2.3.2-2563eb?style=for-the-badge" alt="Version 2.3.2"></a>
+  <a href="#whats-new-in-v233"><img src="https://img.shields.io/badge/version-v2.3.3-2563eb?style=for-the-badge" alt="Version 2.3.3"></a>
   <a href="#supported-platforms"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f766e?style=for-the-badge" alt="Windows macOS Linux"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2018-7c3aed?style=for-the-badge" alt="Node 18+"></a>
 </p>
@@ -91,9 +91,9 @@ That creates three practical problems:
 
 ---
 
-## What’s new in v2.3.2
+## What’s new in v2.3.3
 
-Version `2.3.2` fixes the flow issues where Claude goes silent after onboarding, loops indefinitely instead of announcing completion, and requires Ctrl+O to see responses.
+Version `2.3.3` fixes the flow issues where Claude goes silent after onboarding, loops indefinitely instead of announcing completion, and requires Ctrl+O to see responses.
 
 ### Flow control fixes
 - **Visible output mandate**: All hooks now inject "ALWAYS produce visible text output" - Claude never goes silent.

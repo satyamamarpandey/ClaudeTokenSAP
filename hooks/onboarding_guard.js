@@ -93,7 +93,7 @@ function formatQuestion(q, stepNum, totalSteps, detectedDefault) {
   lines.push("");
   if (detectedDefault) {
     lines.push(`  Auto-detected: ${detectedDefault}`);
-    lines.push(`  Press Enter to confirm, or type a number / custom answer`);
+    lines.push(`  Type 1 to confirm, or type another number / custom answer`);
   } else {
     lines.push(`  Type 1-${q.options.length}, or enter a custom answer`);
   }

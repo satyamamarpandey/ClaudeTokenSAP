@@ -24,10 +24,10 @@ function readJsonStdin() {
   const totalWrites = state.totalWrites || 0;
   const promptCount = state.promptCount || 0;
 
-  // Only fire if meaningful work was done this session
-  if (totalWrites === 0 && promptCount < 3) {
-    process.exit(0);
-  }
+  // Skip during onboarding (steps 1-5) or if no meaningful work done
+  const onboardingStep = state.onboardingStep || 0;
+  if (onboardingStep > 0 && onboardingStep < 6) process.exit(0);
+  if (totalWrites === 0 && promptCount < 3) process.exit(0);
 
   appendDebugLog("verification_guard", { totalWrites, promptCount });
 
