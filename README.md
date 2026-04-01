@@ -311,18 +311,23 @@ Claude attempts to fully read a very large `.log` file.
 
 #### Result
 
-The plugin blocks the full read and returns guidance like:
+The plugin intelligently blocks full noisy reads and returns focused guidance instead.
 
-```text
-Token Optimizer blocked a full read on a large log file to protect your Claude context.
+## Example
 
-Use a narrower strategy instead:
-1. Search for ERROR, WARN, FATAL, exception, timeout, or stack traces first.
-2. Read only the surrounding lines for the real failures.
-3. Collapse repetitive INFO/debug noise into counts or patterns.
-```
+**Command:** `create a calculator`
 
-This saves context before the waste happens.
+![Calculator](./public/Calculator.png)
+
+Instead of reading the entire log or pasted output, it recommends a narrower strategy:
+
+1. Search for `ERROR`, `WARN`, `FATAL`, `exception`, `timeout`, or stack traces first.
+2. Read only the surrounding lines that contain the actual failure.
+3. Collapse repetitive INFO/debug noise into counts or recurring patterns.
+
+This preserves the real signal and prevents unnecessary context waste.
+
+**Token usage:** only **~1.5K tokens** instead of consuming large context windows with noisy logs.
 
 ---
 
