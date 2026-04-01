@@ -226,28 +226,29 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 // ═══════════════════════════════════════════════════════════════════════
 
 test("Onboarding: triggers on fresh project (no CLAUDE.md)", () => {
+  const { writeSessionState } = require("../lib/debug-log");
+  try { writeSessionState({}); } catch {}
+
   const dir = createProjectDir("onboard-fresh", { "package.json": "{}" });
   const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "Build me a todo app" });
 
   if (!result.output) throw new Error("No output - onboarding should trigger");
   const ctx = result.output.hookSpecificOutput.additionalContext;
-  if (!ctx.includes("MANDATORY ONBOARDING")) throw new Error("Missing blocking onboarding directive");
-  if (!ctx.includes("DO NOT WRITE ANY CODE")) throw new Error("Missing code-blocking language");
+
+  // Step 0: should ask Q1 only (app type), not all 5 at once
+  if (!ctx.includes("ONBOARDING")) throw new Error("Missing onboarding directive");
   if (!ctx.includes("What type of app")) throw new Error("Missing question 1 (app type)");
-  if (!ctx.includes("Language and framework")) throw new Error("Missing question 2 (language)");
-  if (!ctx.includes("todo app")) throw new Error("Missing original prompt passthrough");
+  if (!ctx.includes("1 / 5")) throw new Error("Missing step progress indicator");
 
-  // Files should NOT be created by the hook (deferred to Claude after Q&A)
-  if (fs.existsSync(path.join(dir, ".claude", "CLAUDE.md"))) throw new Error("CLAUDE.md should NOT be created by hook (deferred to Claude)");
-  if (fs.existsSync(path.join(dir, ".claude", "settings.json"))) throw new Error("settings.json should NOT be created by hook (deferred to Claude)");
+  // Should NOT show Q2 (language) in the first step
+  if (ctx.includes("Language and framework")) throw new Error("Should not show Q2 on step 0 - one question at a time");
 
-  // Directive should instruct Claude to create files after Q&A
-  if (!ctx.includes("AFTER the user answers all 5 questions")) throw new Error("Missing file creation instructions");
-  if (!ctx.includes(".claudeignore")) throw new Error("Missing .claudeignore creation instruction");
-  if (!ctx.includes("NOT .claudeignore.md")) throw new Error("Missing .claudeignore filename clarification");
+  // Files should NOT be created by the hook
+  if (fs.existsSync(path.join(dir, ".claude", "CLAUDE.md"))) throw new Error("CLAUDE.md should NOT be created by hook");
+  if (fs.existsSync(path.join(dir, ".claude", "settings.json"))) throw new Error("settings.json should NOT be created by hook");
 
   cleanup(dir);
-  return { detail: "Onboarding triggered, file creation deferred to Claude (no eager writes)" };
+  return { detail: "Onboarding step 0: Q1 only shown, file creation deferred" };
 });
 
 test("Onboarding: skips when CLAUDE.md already exists", () => {
@@ -546,12 +547,24 @@ test("PromptPreprocess: auto-compact reminder at prompt #4", () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 test("Onboarding settings.json: directive includes deny/ask rules for Claude to create", () => {
-  // Reset session state so onboardingDone doesn't block this test
+  // Simulate step 5 (all answers collected) to get the completion directive
   const { writeSessionState } = require("../lib/debug-log");
-  try { writeSessionState({}); } catch {}
+  try {
+    writeSessionState({
+      onboardingStep: 5,
+      onboardingOriginalPrompt: "test",
+      detectedSignals: {},
+      onboardingAnswers: {
+        appType: "Web app",
+        stack: "Node.js / Express",
+        users: "Developers",
+        database: "None",
+      },
+    });
+  } catch {}
 
   const dir = createProjectDir("settings-check", { "index.js": "hello" });
-  const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "test" });
+  const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "None" });
 
   if (!result.output) throw new Error("No output from onboarding hook");
   const ctx = result.output.hookSpecificOutput.additionalContext;
@@ -706,11 +719,11 @@ test("Verification guard: fires when work was done this session", () => {
 
   if (!result.output) throw new Error("Expected verification output when work was done");
   const ctx = result.output.systemMessage;
-  if (!ctx.includes("VERIFICATION BEFORE COMPLETION")) throw new Error("Missing verification header");
-  if (!ctx.includes("Evidence before claims")) throw new Error("Missing evidence directive");
-  if (!ctx.includes("run the relevant test")) throw new Error("Missing test verification step");
+  if (!ctx.includes("[Token Optimizer]")) throw new Error("Missing Token Optimizer tag");
+  if (!ctx.includes("Verify before done")) throw new Error("Missing verification directive");
+  if (!ctx.includes("Done.")) throw new Error("Missing Done. completion template");
 
-  return { detail: "Verification guard fires with evidence-based checks" };
+  return { detail: "Verification guard fires with compact evidence-based directive" };
 });
 
 test("Verification guard: silent when no work was done", () => {
@@ -922,12 +935,11 @@ test("Flow: verification guard includes completion announcement", () => {
 
   if (!result.output) throw new Error("Expected verification output");
   const ctx = result.output.systemMessage;
-  if (!ctx.includes("ANNOUNCE COMPLETION")) throw new Error("Missing completion announcement section");
-  if (!ctx.includes("Done.")) throw new Error("Missing 'Done.' template");
+  if (!ctx.includes("Done.")) throw new Error("Missing 'Done.' completion template");
   if (!ctx.includes("Ready to test")) throw new Error("Missing 'Ready to test' signal");
-  if (!ctx.includes("STOP")) throw new Error("Missing STOP directive after completion");
+  if (!ctx.includes("Verify before done")) throw new Error("Missing verification directive");
 
-  return { detail: "Verification guard includes completion announcement and STOP signal" };
+  return { detail: "Verification guard outputs compact completion signal" };
 });
 
 test("Flow: session banner includes flow control rules", () => {
@@ -946,22 +958,37 @@ test("Flow: session banner includes flow control rules", () => {
   return { detail: "Session banner has flow control rules for completion and visibility" };
 });
 
-test("Flow: onboarding includes completion + visibility directives", () => {
-  const { writeSessionState } = require("../lib/debug-log");
-  try { writeSessionState({}); } catch {}
+test("Flow: onboarding completion directive includes setup + done signals", () => {
+  const { writeSessionState, mergeSessionState } = require("../lib/debug-log");
+  // Simulate step 5 (last answer being submitted)
+  try {
+    writeSessionState({
+      onboardingStep: 5,
+      onboardingOriginalPrompt: "build a todo app",
+      detectedSignals: {},
+      onboardingAnswers: {
+        appType: "Web app",
+        stack: "React + TypeScript",
+        users: "Developers",
+        database: "None",
+      },
+    });
+  } catch {}
 
   const dir = createProjectDir("flow-onboard", { "index.js": "hello" });
-  const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "build a todo app" });
+  // Step 5: submitting the last answer ("constraints")
+  const result = runHook("onboarding_guard.js", { cwd: dir, prompt: "None" });
 
   if (!result.output) throw new Error("No output");
   const ctx = result.output.hookSpecificOutput.additionalContext;
+  if (!ctx.includes("ONBOARDING COMPLETE")) throw new Error("Missing ONBOARDING COMPLETE signal");
   if (!ctx.includes("Setup complete")) throw new Error("Missing post-onboarding flow announcement");
   if (!ctx.includes("Done.")) throw new Error("Missing build completion signal");
   if (!ctx.includes("Ready to test")) throw new Error("Missing ready-to-test signal");
-  if (!ctx.includes("visible output")) throw new Error("Missing visible output directive");
+  if (!ctx.includes(".claudeignore")) throw new Error("Missing .claudeignore creation instruction");
 
   cleanup(dir);
-  return { detail: "Onboarding directive includes full flow: setup → build → announce done" };
+  return { detail: "Onboarding completion directive includes full flow: setup → build → announce done" };
 });
 
 test("Flow: CLAUDE.md reminder frequency reduced (every 5, not 3)", () => {

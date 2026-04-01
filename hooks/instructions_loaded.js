@@ -62,6 +62,10 @@ function detectStack(rootDir) {
   mergeSessionState((prev) => ({
     ...prev,
     onboardingDone: false,
+    onboardingStep: 0,
+    onboardingAnswers: {},
+    onboardingOriginalPrompt: null,
+    detectedSignals: {},
     promptCount: 0,
     sessionStartedAt: new Date().toISOString(),
   }));

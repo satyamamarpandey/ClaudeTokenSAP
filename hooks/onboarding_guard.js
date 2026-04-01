@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { appendDebugLog, mergeSessionState, readSessionState } = require("../lib/debug-log");
-const { analyzePrompt, generateHints, formatDetectedContext } = require("../lib/prompt-analyzer");
+const { analyzePrompt } = require("../lib/prompt-analyzer");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -45,175 +45,62 @@ const ASK_RULES = [
   "Read(**/*.wav)",
 ];
 
-(async () => {
-  const payload = await readJsonStdin();
-  const cwd = payload.cwd || process.cwd();
-  const prompt = payload.prompt || "";
+// One question per turn - presented one at a time
+const QUESTIONS = [
+  {
+    key: "appType",
+    label: "What type of app are you building?",
+    options: ["Web app", "Mobile app", "CLI tool", "API / Backend", "Desktop app"],
+  },
+  {
+    key: "stack",
+    label: "Language and framework?",
+    options: ["React + TypeScript", "Next.js", "Vue / Nuxt", "Python", "Flutter / Dart", "Node.js / Express"],
+  },
+  {
+    key: "users",
+    label: "Who are the target users?",
+    options: ["Developers", "Students", "General consumers", "Business users"],
+  },
+  {
+    key: "database",
+    label: "Database?",
+    options: ["None", "PostgreSQL", "SQLite", "MongoDB", "MySQL"],
+  },
+  {
+    key: "constraints",
+    label: "Any constraints or preferences?",
+    options: ["None", "Dark theme", "Mobile-first / responsive", "Performance-critical", "Accessibility (WCAG)"],
+  },
+];
 
-  const claudeDir = path.join(cwd, ".claude");
-  const claudeMdPath = path.join(claudeDir, "CLAUDE.md");
-  const settingsPath = path.join(claudeDir, "settings.json");
+function resolveOption(text, options) {
+  const t = (text || "").trim();
+  if (!t) return null; // blank → caller uses default
+  const n = parseInt(t, 10);
+  if (n >= 1 && n <= options.length) return options[n - 1];
+  return t; // free-text answer
+}
 
-  // Skip if already onboarded (CLAUDE.md exists)
-  if (fs.existsSync(claudeMdPath)) {
-    appendDebugLog("onboarding_skip", { reason: "CLAUDE.md exists", cwd });
-    process.exit(0);
-  }
-
-  // Skip if already ran this session
-  const state = readSessionState();
-  if (state.onboardingDone) {
-    appendDebugLog("onboarding_skip", { reason: "already done this session" });
-    process.exit(0);
-  }
-
-  mergeSessionState((prev) => ({ ...prev, onboardingDone: true }));
-
-  const projectName = path.basename(cwd) || "Project";
-
-  // NOTE: We do NOT create files here. Files are created by Claude after
-  // the user answers onboarding questions. This prevents leftover placeholder
-  // files when the API connection fails (FailedToOpenSocket, etc).
-  // Session state (onboardingDone = true) prevents re-triggering within session.
-
-  appendDebugLog("onboarding_triggered", { cwd, projectName });
-
-  // Build file contents that Claude will create after Q&A
-  const settingsContent = JSON.stringify({
-    permissions: {
-      deny: DENY_RULES,
-      ask: ASK_RULES,
-    },
-  }, null, 2);
-
-  const claudeignoreContent = [
-    "# Token Optimizer - auto-generated .claudeignore",
-    "# Blocks noisy directories and files from Claude Code indexing",
-    "",
-    "node_modules/",
-    "dist/",
-    "build/",
-    ".next/",
-    "coverage/",
-    ".turbo/",
-    "vendor/",
-    "out/",
-    ".git/",
-    ".cache/",
-    ".parcel-cache/",
-    "__pycache__/",
-    "target/",
-    "",
-    "# Large/binary files",
-    "*.lock",
-    "*.log",
-    "*.map",
-    "*.min.js",
-    "*.min.css",
-    "*.wasm",
-    "*.pb",
-    "*.tsbuildinfo",
-    "*.pyc",
-    "*.class",
-  ].join("\n");
-
-  // ── Smart prompt analysis ──
-  const savedPrompt = prompt.slice(0, 500);
-  const detected = analyzePrompt(savedPrompt);
-  const hints = generateHints(detected);
-  const detectedSummary = formatDetectedContext(detected);
-
-  appendDebugLog("onboarding_analysis", { detected: { appType: detected.appType, framework: detected.framework, language: detected.language, database: detected.database, platform: detected.platform, domain: detected.domain }, signalCount: detected.signals.length });
-
-  // Save detected signals in session state for follow-up use
-  mergeSessionState((prev) => ({ ...prev, detectedSignals: detected, onboardingPrompt: savedPrompt }));
-
-  // ── Build smart directive with contextual hints ──
-  const directive = [
-    "⛔ MANDATORY ONBOARDING - DO NOT WRITE ANY CODE YET ⛔",
-    "",
-    "The user said: \"" + savedPrompt + "\"",
+function formatQuestion(q, stepNum, totalSteps, detectedDefault) {
+  const lines = [
+    `[ ${stepNum} / ${totalSteps} ]  ${q.label}`,
     "",
   ];
-
-  // Show what was auto-detected (if anything)
-  if (detectedSummary) {
-    directive.push(
-      "🔍 Auto-detected from prompt: " + detectedSummary,
-      "",
-      "Some answers may already be clear from the prompt. Show detected values as defaults",
-      "so the user can confirm with a quick 'yes' or correct them.",
-      ""
-    );
+  q.options.forEach((opt, i) => {
+    lines.push(`  ${i + 1}.  ${opt}`);
+  });
+  lines.push("");
+  if (detectedDefault) {
+    lines.push(`  Auto-detected: ${detectedDefault}`);
+    lines.push(`  Press Enter to confirm, or type a number / custom answer`);
   } else {
-    directive.push(
-      "No clear signals detected in the prompt. Ask all questions without defaults.",
-      ""
-    );
+    lines.push(`  Type 1-${q.options.length}, or enter a custom answer`);
   }
+  return lines.join("\n");
+}
 
-  directive.push(
-    "YOUR ONLY RESPONSE right now must be these 5 questions.",
-    "Format each question as a numbered item with a hint line underneath.",
-    "If a value was detected, show it as `[default: X]` so the user can just confirm.",
-    "",
-    "```",
-    "1. **What type of app are you building?**",
-    detected.appType
-      ? `   [detected: ${detected.appType}] - press Enter to confirm or type to change`
-      : `   ${hints.appType}`,
-    "",
-    "2. **Language and framework?**",
-    detected.framework
-      ? `   [detected: ${detected.framework}${detected.language ? " (" + detected.language + ")" : ""}] - confirm or specify`
-      : `   ${hints.framework}`,
-    "",
-    "3. **Who are the target users?**",
-    `   ${hints.users}`,
-    "",
-    "4. **Database?**",
-    detected.database
-      ? `   [detected: ${detected.database}] - confirm or correct`
-      : `   ${hints.database}`,
-    "",
-    "5. **Any constraints or preferences?**",
-    `   ${hints.constraints}`,
-    "```",
-    "",
-    "AFTER the user answers all 5 questions, CREATE these files:",
-    "",
-    "Step 1: Create `.claude/` directory (Bash: mkdir -p .claude)",
-    "Step 2: Write `.claude/CLAUDE.md` with user answers (keep under 20 lines):",
-    "  # ProjectName",
-    "  Building: [Q1 answer]",
-    "  Stack: [Q2 answer]",
-    "  Users: [Q3 answer]",
-    "  Database: [Q4 answer]",
-    "  Constraints: [Q5 answer]",
-    "  # AI strategy",
-    "  Use Haiku for simple tasks; Sonnet for main development; Opus only for complex architecture, complex coding, deep reasoning, or when Sonnet fails after 2 attempts.",
-    "  Keep context low: Grep before Read, targeted reads only.",
-    "  # Rules",
-    "  Concise responses. No overengineering. No unrequested extras.",
-    "",
-    "Step 3: Write `.claude/settings.json` with this content:",
-    "  " + settingsContent.split("\n").slice(0, 3).join(" ") + " ...",
-    "",
-    "Step 4: Write `.claudeignore` in project ROOT (NOT .claudeignore.md):",
-    "  Standard ignore patterns for node_modules, dist, build, .next, etc.",
-    "",
-    "- THEN announce to the user: 'Setup complete. Now building: [original request]'",
-    "- THEN execute the original request: \"" + savedPrompt.slice(0, 200) + "\"",
-    "- When the build is DONE, announce: 'Done. [1-line summary of what was created]. Ready to test.' Then STOP.",
-    "",
-    "⚠️ DO NOT write code or start building until you have ALL 5 answers AND created the files.",
-    "⚠️ DO NOT say \"Let me help you build...\" - just ask the 5 questions immediately.",
-    "⚠️ If user answers briefly (e.g., 'yes' or '1. web, 2. react, ...'), accept defaults and proceed.",
-    "⚠️ ALWAYS produce visible output the user can read. Never go silent.",
-  );
-
-  const directiveStr = directive.join("\n");
-
+function emit(directiveStr) {
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
@@ -222,4 +109,142 @@ const ASK_RULES = [
       },
     })
   );
+}
+
+(async () => {
+  const payload = await readJsonStdin();
+  const cwd = payload.cwd || process.cwd();
+  const prompt = (payload.prompt || "").trim();
+
+  const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
+
+  // Already onboarded - skip entirely
+  if (fs.existsSync(claudeMdPath)) {
+    process.exit(0);
+  }
+
+  const state = readSessionState();
+  const step = state.onboardingStep || 0;
+
+  // Completed onboarding this session - skip
+  if (step >= 6) {
+    process.exit(0);
+  }
+
+  appendDebugLog("onboarding_step", { step, cwd });
+
+  // ── Step 0: first trigger - save original prompt, ask Q1 ──────────────
+  if (step === 0) {
+    const detected = analyzePrompt(prompt.slice(0, 500));
+    mergeSessionState((prev) => ({
+      ...prev,
+      onboardingStep: 1,
+      onboardingOriginalPrompt: prompt.slice(0, 400),
+      detectedSignals: detected,
+      onboardingAnswers: {},
+    }));
+
+    appendDebugLog("onboarding_start", { originalPrompt: prompt.slice(0, 100) });
+
+    const qText = formatQuestion(QUESTIONS[0], 1, 5, detected.appType || null);
+
+    emit([
+      "⛔ ONBOARDING - Ask ONLY this question. Do NOT write code or start the task yet.",
+      "",
+      qText,
+      "",
+      "Present this question clearly, then STOP and wait for the user's answer.",
+    ].join("\n"));
+    return;
+  }
+
+  // ── Steps 1–5: capture answer to Q(step-1), ask Q(step) or finalize ───
+  const answers = { ...(state.onboardingAnswers || {}) };
+  const prevQ = QUESTIONS[step - 1];
+  answers[prevQ.key] = resolveOption(prompt, prevQ.options) || prevQ.options[0];
+
+  if (step < 5) {
+    mergeSessionState((prev) => ({
+      ...prev,
+      onboardingStep: step + 1,
+      onboardingAnswers: answers,
+    }));
+
+    const detected = state.detectedSignals || {};
+    let detectedDefault = null;
+    if (step === 1) detectedDefault = detected.framework || null;
+    if (step === 3) detectedDefault = detected.database || null;
+
+    const qText = formatQuestion(QUESTIONS[step], step + 1, 5, detectedDefault);
+
+    emit([
+      `⛔ ONBOARDING - Ask Question ${step + 1}. Do NOT write code yet.`,
+      "",
+      qText,
+      "",
+      "Present this question, then STOP and wait for the user's answer.",
+    ].join("\n"));
+    return;
+  }
+
+  // ── Step 5 complete: all answers collected - create files ──────────────
+  mergeSessionState((prev) => ({
+    ...prev,
+    onboardingStep: 6,
+    onboardingDone: true,
+    onboardingAnswers: answers,
+  }));
+
+  appendDebugLog("onboarding_complete", { answers });
+
+  const projectName = path.basename(cwd) || "Project";
+  const originalPrompt = state.onboardingOriginalPrompt || "";
+  const constraints = (answers.constraints === "None") ? "None" : (answers.constraints || "None");
+
+  const settingsContent = JSON.stringify({
+    permissions: { deny: DENY_RULES, ask: ASK_RULES },
+  }, null, 2);
+
+  const claudeignoreContent = [
+    "node_modules/", "dist/", "build/", ".next/", "coverage/",
+    ".turbo/", "vendor/", "out/", ".git/", ".cache/", ".parcel-cache/",
+    "__pycache__/", "target/",
+    "*.lock", "*.log", "*.map", "*.min.js", "*.min.css",
+    "*.wasm", "*.pb", "*.tsbuildinfo", "*.pyc", "*.class",
+  ].join("\n");
+
+  emit([
+    "✅ ONBOARDING COMPLETE - Create the project files now, then execute the original request.",
+    "",
+    `Collected answers:`,
+    `  App type:    ${answers.appType}`,
+    `  Stack:       ${answers.stack}`,
+    `  Users:       ${answers.users}`,
+    `  Database:    ${answers.database}`,
+    `  Constraints: ${constraints}`,
+    "",
+    "Step 1: Bash: mkdir -p .claude",
+    "Step 2: Write .claude/CLAUDE.md (keep under 20 lines):",
+    `  # ${projectName}`,
+    `  Building: ${answers.appType}`,
+    `  Stack: ${answers.stack}`,
+    `  Users: ${answers.users}`,
+    `  Database: ${answers.database}`,
+    `  Constraints: ${constraints}`,
+    `  # AI strategy`,
+    `  Use Haiku for simple tasks; Sonnet for main dev; Opus for complex arch or if Sonnet fails 2x.`,
+    `  Keep context low: Grep before Read, targeted reads only.`,
+    `  # Rules`,
+    `  Concise responses. No overengineering. No unrequested extras.`,
+    "",
+    "Step 3: Write .claude/settings.json:",
+    settingsContent,
+    "",
+    "Step 4: Write .claudeignore in project ROOT (not .claudeignore.md):",
+    claudeignoreContent,
+    "",
+    `Step 5: Announce: 'Setup complete. Now building: ${originalPrompt.slice(0, 100)}'`,
+    `Step 6: Execute the original request: "${originalPrompt}"`,
+    "Step 7 when done: 'Done. [1-line summary]. Ready to test.' Then STOP.",
+  ].join("\n"));
 })();
