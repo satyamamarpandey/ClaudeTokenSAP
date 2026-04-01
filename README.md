@@ -318,7 +318,13 @@ The plugin intelligently blocks full noisy reads and returns focused guidance in
 **Command:** `create a calculator`
 
 <p align="center">
-  <img src="./public/Calculator.png" alt="Calculator example" width="420" />
+  <img
+    src="./public/Calculator.png"
+    alt="Calculator example"
+    width="280"
+    height="500"
+    style="object-fit: contain;"
+  />
 </p>
 
 Instead of reading the entire log or pasted output, it recommends a narrower strategy:
