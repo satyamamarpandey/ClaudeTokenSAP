@@ -2,7 +2,6 @@
 
 # ClaudeTokenSAP
 
-
 ### A Claude Code marketplace for leaner context, sharper build starts, and smarter long-running sessions
 
 <p>
@@ -18,6 +17,13 @@
   <img src="https://img.shields.io/badge/Plugin-token--optimizer-16a34a?style=flat-square" alt="token-optimizer">
   <img src="https://img.shields.io/badge/Hooks-6%20active-f59e0b?style=flat-square" alt="6 active hooks">
   <img src="https://img.shields.io/badge/Design-cross--platform-2563eb?style=flat-square" alt="Cross platform">
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/version-v2.3.7-blue" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/github/stars/satyamamarpandey/ClaudeTokenSAP" alt="Stars">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac%20%7C%20Linux-purple" alt="Platform">
 </p>
 
 </div>
