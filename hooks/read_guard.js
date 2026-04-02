@@ -7,9 +7,9 @@ const {
 const { recordRead } = require("../lib/dedup-tracker");
 const { addTokens } = require("../lib/token-budget");
 
-const LARGE_FILE_BYTES = 120 * 1024;
-const VERY_LARGE_FILE_BYTES = 400 * 1024;
-const LARGE_SOURCE_FILE_BYTES = 300 * 1024;
+const LARGE_FILE_BYTES = 50 * 1024;       // 50KB: block noisy files (JSON, YAML, logs, etc.)
+const VERY_LARGE_FILE_BYTES = 400 * 1024; // 400KB: block any file
+const LARGE_SOURCE_FILE_BYTES = 150 * 1024; // 150KB: block large source files
 
 const BINARY_EXTENSIONS = new Set([
   ".png", ".jpg", ".jpeg", ".gif", ".ico", ".bmp", ".webp", ".svg",

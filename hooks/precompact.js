@@ -109,12 +109,26 @@ function recentDebugEvents(limit = 5) {
     }
   } catch {}
 
-  // Inject directive to update CLAUDE.md with anything learned
+  // Session summary (what was accomplished)
+  const totalBlocked = state.blockedReads || 0;
+  const totalWrites = state.totalWrites || 0;
+  const promptCount = state.promptCount || 0;
+  const summaryParts = [];
+  if (promptCount > 0) summaryParts.push(`${promptCount} prompts`);
+  if (totalWrites > 0) summaryParts.push(`${totalWrites} files changed`);
+  if (totalBlocked > 0) summaryParts.push(`${totalBlocked} large reads blocked`);
+  if (summaryParts.length > 0) {
+    lines.push("", "Session summary: " + summaryParts.join(" | "));
+  }
+
+  // Inject directive to update CLAUDE.md + memory with anything learned
   lines.push(
     "",
-    "AFTER COMPACTION: If you learned anything new about the project during this session",
-    "(stack, key files, architecture patterns, constraints), update .claude/CLAUDE.md",
-    "using the Edit tool. Keep it concise - max 20 lines total."
+    "AFTER COMPACTION:",
+    "1. Update .claude/CLAUDE.md with any new stack/architecture facts (keep under 20 lines).",
+    "2. Write a brief memory entry (Write tool → memory/*.md) summarizing key decisions/changes",
+    "   so future sessions start with less context. Include: what changed, why, next steps.",
+    "3. Then continue with the user's task."
   );
 
   const events = recentDebugEvents(4);

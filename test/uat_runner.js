@@ -210,7 +210,7 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 
     if (!result.output) throw new Error("No output from SessionStart hook");
     const ctx = result.output.hookSpecificOutput.additionalContext;
-    if (!ctx.includes("TOKEN OPTIMIZER v2.3.3")) throw new Error("Missing version header");
+    if (!ctx.includes("TOKEN OPTIMIZER v2.3.4")) throw new Error("Missing version header");
     if (!ctx.includes("MANDATORY RULES")) throw new Error("Missing mandatory rules");
     if (!ctx.includes("SEARCH FIRST")) throw new Error("Missing SEARCH FIRST section");
     if (!ctx.includes("CONCISE OUTPUT")) throw new Error("Missing CONCISE OUTPUT section");
@@ -823,7 +823,7 @@ test("Verification guard: fires when work was done this session", () => {
   if (!result.output) throw new Error("Expected verification output when work was done");
   const ctx = result.output.systemMessage;
   if (!ctx.includes("[Token Optimizer]")) throw new Error("Missing Token Optimizer tag");
-  if (!ctx.includes("Verify before done")) throw new Error("Missing verification directive");
+  if (!ctx.includes("Done. Test it.")) throw new Error("Missing verification directive");
   if (!ctx.includes("Done.")) throw new Error("Missing Done. completion template");
 
   return { detail: "Verification guard fires with compact evidence-based directive" };
@@ -1040,7 +1040,7 @@ test("Flow: verification guard includes completion announcement", () => {
   const ctx = result.output.systemMessage;
   if (!ctx.includes("Done.")) throw new Error("Missing 'Done.' completion template");
   if (!ctx.includes("Ready to test")) throw new Error("Missing 'Ready to test' signal");
-  if (!ctx.includes("Verify before done")) throw new Error("Missing verification directive");
+  if (!ctx.includes("Done. Test it.")) throw new Error("Missing verification directive");
 
   return { detail: "Verification guard outputs compact completion signal" };
 });
@@ -1122,7 +1122,7 @@ test("Flow: CLAUDE.md reminder frequency reduced (every 5, not 3)", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.3.3 - UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.3.4 - UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));

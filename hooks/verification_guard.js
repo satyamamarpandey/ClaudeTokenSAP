@@ -1,4 +1,5 @@
 const { appendDebugLog, readSessionState } = require("../lib/debug-log");
+const { estimateTranscriptTokens } = require("../lib/transcript-tracker");
 
 function readJsonStdin() {
   return new Promise((resolve) => {
@@ -31,18 +32,19 @@ function readJsonStdin() {
 
   appendDebugLog("verification_guard", { totalWrites, promptCount });
 
-  const archSignals = state.archSignals || {};
-  const extras = [];
-  if (archSignals.depsModified) extras.push("verify install/lock file");
-  if (archSignals.dbModified) extras.push("verify migrations");
+  // Token count from transcript
+  const transcriptPath = payload.transcript_path || payload.transcriptPath || null;
+  const tokens = estimateTranscriptTokens(transcriptPath);
+  const tokenLine = tokens
+    ? `~${tokens.inputTokens.toLocaleString()} in / ~${tokens.outputTokens.toLocaleString()} out / ~${tokens.totalTokens.toLocaleString()} total`
+    : null;
 
-  const msg = [
-    `[Token Optimizer] Verify before done: run tests/build, check files exist${extras.length ? ", " + extras.join(", ") : ""}. Then say: 'Done. [summary]. Ready to test.'`,
-  ].join("");
+  // Write directly to stderr - avoids "Stop says:" prefix in the terminal
+  const msg = tokenLine
+    ? `[Token Optimizer] Done. Test it. | Tokens: ${tokenLine}`
+    : `[Token Optimizer] Done. Test it.`;
+  process.stderr.write(msg + "\n");
 
-  process.stdout.write(
-    JSON.stringify({
-      systemMessage: msg,
-    })
-  );
+  // Empty stdout - no systemMessage means no "Stop says:" display
+  process.stdout.write("{}");
 })();

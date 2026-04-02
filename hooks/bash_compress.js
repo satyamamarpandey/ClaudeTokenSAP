@@ -1,8 +1,8 @@
 const { appendDebugLog, mergeSessionState } = require("../lib/debug-log");
 
-const HEAD_LINES = 20;
-const TAIL_LINES = 20;
-const MIN_LINES_TO_COMPRESS = 60;
+const HEAD_LINES = 50;
+const TAIL_LINES = 50;
+const MIN_LINES_TO_COMPRESS = 200;
 
 
 function readJsonStdin() {

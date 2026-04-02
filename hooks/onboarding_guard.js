@@ -32,6 +32,9 @@ const DENY_RULES = [
   "Read(.git/**)",
   "Read(**/*.wasm)",
   "Read(**/*.pb)",
+  "Read(**/.env)",
+  "Read(**/.env.*)",
+  "Read(**/*.env)",
 ];
 
 const ASK_RULES = [
@@ -136,6 +139,34 @@ function emit(directiveStr) {
   // ── Step 0: first trigger - save original prompt, ask Q1 ──────────────
   if (step === 0) {
     const detected = analyzePrompt(prompt.slice(0, 500));
+
+    // Enhance detection by scanning project files on disk
+    const stackFiles = [
+      { file: "package.json", detect: () => {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(path.join(cwd, "package.json"), "utf8"));
+          const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+          if (deps.next) return "Next.js";
+          if (deps.react) return "React + TypeScript";
+          if (deps.vue || deps.nuxt) return "Vue / Nuxt";
+          return "Node.js / Express";
+        } catch { return "Node.js / Express"; }
+      }},
+      { file: "requirements.txt", detect: () => "Python" },
+      { file: "pyproject.toml",   detect: () => "Python" },
+      { file: "Cargo.toml",       detect: () => "Rust" },
+      { file: "go.mod",           detect: () => "Go" },
+      { file: "pubspec.yaml",     detect: () => "Flutter / Dart" },
+      { file: "pom.xml",          detect: () => "Java" },
+      { file: "build.gradle",     detect: () => "Java" },
+    ];
+    for (const { file, detect } of stackFiles) {
+      if (fs.existsSync(path.join(cwd, file))) {
+        detected.framework = detected.framework || detect();
+        break;
+      }
+    }
+
     mergeSessionState((prev) => ({
       ...prev,
       onboardingStep: 1,
@@ -206,13 +237,27 @@ function emit(directiveStr) {
     permissions: { deny: DENY_RULES, ask: ASK_RULES },
   }, null, 2);
 
-  const claudeignoreContent = [
+  const baseIgnore = [
     "node_modules/", "dist/", "build/", ".next/", "coverage/",
     ".turbo/", "vendor/", "out/", ".git/", ".cache/", ".parcel-cache/",
     "__pycache__/", "target/",
     "*.lock", "*.log", "*.map", "*.min.js", "*.min.css",
     "*.wasm", "*.pb", "*.tsbuildinfo", "*.pyc", "*.class",
-  ].join("\n");
+    ".env", ".env.*", "*.env",
+  ];
+
+  // Merge .gitignore rules (git-aware ignore)
+  const gitignorePath = path.join(cwd, ".gitignore");
+  if (fs.existsSync(gitignorePath)) {
+    const baseSet = new Set(baseIgnore);
+    const extra = fs.readFileSync(gitignorePath, "utf8")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#") && !baseSet.has(l));
+    baseIgnore.push(...extra);
+  }
+
+  const claudeignoreContent = baseIgnore.join("\n");
 
   emit([
     "✅ ONBOARDING COMPLETE - Create the project files now, then execute the original request.",

@@ -319,25 +319,28 @@ function tryCompressLogInPrompt(prompt) {
 
   // ── 6c. Auto-compact: forceful when budget is high ──
   // Uses transcript token count if available (more accurate), falls back to heuristic.
+  const COMPACT_THRESHOLD = 100000; // trigger at 100k tokens
+  const COMPACT_CRITICAL = 150000;  // hard-block at 150k tokens
   const transcriptPct = transcriptStats
     ? transcriptStats.totalTokens / 200000
     : 0;
+  const totalTokensSoFar = transcriptStats ? transcriptStats.totalTokens : 0;
   const compactCheck = shouldCompact();
-  const needsCompact = transcriptPct >= 0.7 || compactCheck.should;
+  const needsCompact = totalTokensSoFar >= COMPACT_THRESHOLD || compactCheck.should;
 
   if (needsCompact) {
     const reason = transcriptStats
       ? `context at ~${Math.round(transcriptPct * 100)}% (${transcriptStats.totalTokens.toLocaleString()} / 200k tokens)`
       : compactCheck.reason;
 
-    if (transcriptPct >= 0.85 || (transcriptStats && transcriptStats.totalTokens >= 160000)) {
+    if (totalTokensSoFar >= COMPACT_CRITICAL || transcriptPct >= 0.85) {
       // Critical: instruct Claude to demand /compact before answering
       contextLines.push(
         "",
         `⚠️ TOKEN BUDGET CRITICAL (${reason}): BEFORE answering this prompt, output ONLY: "Context is ${Math.round(transcriptPct * 100)}% full. Please run /compact now, then I'll continue." Then STOP and wait. Do NOT answer the user's question until after they run /compact.`
       );
     } else {
-      // High: finish current task, then immediately prompt for /compact
+      // Hit 100k: finish current task then prompt for /compact
       contextLines.push(
         "",
         `[Token Optimizer: ${reason}. After your response, tell the user: "Run /compact now to keep the session efficient."]`
@@ -346,11 +349,11 @@ function tryCompressLogInPrompt(prompt) {
     appendDebugLog("compact_triggered", { reason, transcriptPct: Math.round(transcriptPct * 100) });
   }
 
-  // ── 7. CLAUDE.md update reminder (every 5 prompts - low frequency to avoid looping) ──
-  if (promptCount > 1 && promptCount % 5 === 0) {
+  // ── 7. CLAUDE.md + memory update reminder (every 3 prompts) ──
+  if (promptCount > 1 && promptCount % 3 === 0) {
     contextLines.push(
       "",
-      "[Token Optimizer: If you learned new project facts (dependency, pattern, decision), append 1-2 lines to .claude/CLAUDE.md. Otherwise skip.]"
+      "[Token Optimizer: Checkpoint — if you learned new project facts (dependency, pattern, decision), append 1-2 lines to .claude/CLAUDE.md AND write a brief memory entry (Write tool → memory/*.md) so future sessions start with less context. Otherwise skip.]"
     );
   }
 

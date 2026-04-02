@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.3.4] - 2026-04-02
+
+### Added
+- **Secret detector hook registered.** `secret_detector.js` is now wired into the `UserPromptSubmit` hook chain (between `onboarding_guard` and `prompt_preprocess`). It scans the first 8000 chars of every prompt for API keys, GitHub tokens, AWS keys, Stripe keys, private key blocks, and inline `.env` assignments, and warns before Claude processes them.
+
+---
+
 ## [2.3.3] - 2026-03-31
 
 ### Fixed
