@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.3.7] - 2026-04-02
+
+### Added
+- **Expanded intent classification (18 categories).** `classifyIntent()` now covers 18 intent categories, up from 11. New categories: `llm_app` (RAG, AI agents, LangChain, Vercel AI SDK, CrewAI), `devops` (CI/CD pipelines, Terraform, Kubernetes, Ansible), `desktop_app` (Electron, Tauri, native GUI), `browser_extension` (Chrome MV3, Firefox, cross-browser), `blockchain` (Ethereum/EVM, Solana, Solidity, Foundry), `data_engineering` (Spark, Kafka, Airflow, dbt, data warehouses), `embedded` (Arduino, ESP32, STM32, FreeRTOS, MicroPython). Each new category has 5 tailored questions with relevant tech-stack options. Prompts like "Create a RAG chatbot" → `llm_app`, "Set up a GitHub Actions pipeline" → `devops`, "Build an Ethereum DeFi protocol" → `blockchain`, "Write firmware for ESP32" → `embedded`.
+
+---
+
+## [2.3.6] - 2026-04-02
+
+### Added
+- **Intent-aware onboarding questions.** Replaced the static 5-question set with 11 intent-based question sets: `trading`, `data_analysis`, `ml_model`, `web_app`, `api_backend`, `mobile_app`, `cli_tool`, `bot`, `game`, `library`, `script`, `default`. The hook classifies the first prompt using regex + analyzer signals and serves relevant questions. "Create a trading strategy" now asks about market, timeframe, language, data source, and output format. The `classifyIntent()` function covers ~20 intent patterns including algo trading signals (RSI, MACD, backtest keywords), ML tasks, data pipelines, bots, and more.
+
+---
+
+## [2.3.5] - 2026-04-02
+
+### Fixed
+- **Onboarding re-triggers every session.** The guard checks for `.claude/CLAUDE.md` to skip onboarding, but previously relied on Claude to create it. Claude sometimes skips that step. Now the hook writes `.claude/CLAUDE.md`, `.claude/settings.json`, and `.claudeignore` itself at step 5 completion — guaranteed regardless of Claude's behavior.
+
+---
+
 ## [2.3.4] - 2026-04-02
 
 ### Added

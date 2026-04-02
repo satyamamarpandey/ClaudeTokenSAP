@@ -83,7 +83,7 @@ function detectStack(rootDir) {
   });
 
   const lines = [
-    "TOKEN OPTIMIZER v2.3.4 - Context Savings Policy",
+    "TOKEN OPTIMIZER v2.3.7 - Context Savings Policy",
     "",
     "MANDATORY RULES (apply to EVERY response this session):",
     "",

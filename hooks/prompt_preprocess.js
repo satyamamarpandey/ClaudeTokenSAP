@@ -302,10 +302,10 @@ function tryCompressLogInPrompt(prompt) {
     transcriptInputTokens = transcriptStats.inputTokens;
     transcriptOutputTokens = transcriptStats.outputTokens;
     const totalTranscript = transcriptStats.totalTokens;
-    const pctOfBudget = Math.round((totalTranscript / 200000) * 100);
+    const pctOfBudget = Math.round((totalTranscript / 1000000) * 100);
     contextLines.push(
       "",
-      `[Token Optimizer] Session tokens: ~${transcriptInputTokens.toLocaleString()} input / ~${transcriptOutputTokens.toLocaleString()} output / ~${totalTranscript.toLocaleString()} total (${pctOfBudget}% of 200k budget)`
+      `[Token Optimizer] Session tokens: ~${transcriptInputTokens.toLocaleString()} input / ~${transcriptOutputTokens.toLocaleString()} output / ~${totalTranscript.toLocaleString()} total (${pctOfBudget}% of 1M budget)`
     );
     appendDebugLog("transcript_tokens", { transcriptInputTokens, transcriptOutputTokens, totalTranscript, pctOfBudget });
   }
@@ -319,10 +319,10 @@ function tryCompressLogInPrompt(prompt) {
 
   // ── 6c. Auto-compact: forceful when budget is high ──
   // Uses transcript token count if available (more accurate), falls back to heuristic.
-  const COMPACT_THRESHOLD = 100000; // trigger at 100k tokens
-  const COMPACT_CRITICAL = 150000;  // hard-block at 150k tokens
+  const COMPACT_THRESHOLD = 500000; // trigger at 500k tokens
+  const COMPACT_CRITICAL = 750000;  // hard-block at 750k tokens
   const transcriptPct = transcriptStats
-    ? transcriptStats.totalTokens / 200000
+    ? transcriptStats.totalTokens / 1000000
     : 0;
   const totalTokensSoFar = transcriptStats ? transcriptStats.totalTokens : 0;
   const compactCheck = shouldCompact();
@@ -330,7 +330,7 @@ function tryCompressLogInPrompt(prompt) {
 
   if (needsCompact) {
     const reason = transcriptStats
-      ? `context at ~${Math.round(transcriptPct * 100)}% (${transcriptStats.totalTokens.toLocaleString()} / 200k tokens)`
+      ? `context at ~${Math.round(transcriptPct * 100)}% (${transcriptStats.totalTokens.toLocaleString()} / 1M tokens)`
       : compactCheck.reason;
 
     if (totalTokensSoFar >= COMPACT_CRITICAL || transcriptPct >= 0.85) {
@@ -349,8 +349,8 @@ function tryCompressLogInPrompt(prompt) {
     appendDebugLog("compact_triggered", { reason, transcriptPct: Math.round(transcriptPct * 100) });
   }
 
-  // ── 7. CLAUDE.md + memory update reminder (every 3 prompts) ──
-  if (promptCount > 1 && promptCount % 3 === 0) {
+  // ── 7. CLAUDE.md + memory update reminder (every 5 prompts) ──
+  if (promptCount > 1 && promptCount % 5 === 0) {
     contextLines.push(
       "",
       "[Token Optimizer: Checkpoint — if you learned new project facts (dependency, pattern, decision), append 1-2 lines to .claude/CLAUDE.md AND write a brief memory entry (Write tool → memory/*.md) so future sessions start with less context. Otherwise skip.]"

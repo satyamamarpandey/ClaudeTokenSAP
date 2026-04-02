@@ -8,7 +8,7 @@
 <p>
   <a href="#installation"><img src="https://img.shields.io/badge/install-2%20commands-111827?style=for-the-badge" alt="Install in 2 commands"></a>
   <a href="#why-teams-use-it"><img src="https://img.shields.io/badge/token%20focus-context%20efficiency-16a34a?style=for-the-badge" alt="Context efficiency"></a>
-  <a href="#whats-new-in-v234"><img src="https://img.shields.io/badge/version-v2.3.4-2563eb?style=for-the-badge" alt="Version 2.3.4"></a>
+  <a href="#whats-new-in-v237"><img src="https://img.shields.io/badge/version-v2.3.7-2563eb?style=for-the-badge" alt="Version 2.3.7"></a>
   <a href="#supported-platforms"><img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f766e?style=for-the-badge" alt="Windows macOS Linux"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/node-%E2%89%A5%2018-7c3aed?style=for-the-badge" alt="Node 18+"></a>
 </p>
@@ -90,6 +90,18 @@ That creates three practical problems:
 **Token Optimizer** is designed to intervene at exactly those points.
 
 ---
+
+## What’s new in v2.3.7
+
+Version `2.3.7` makes onboarding questions fully dynamic. The hook now calls Claude Haiku to generate 3–7 custom questions tailored to the exact prompt — skipping what’s already obvious. "Create a React dashboard with PostgreSQL" won’t ask about framework or database. Falls back to the 11 static intent sets (v2.3.6) when the API is unavailable.
+
+## What’s new in v2.3.6
+
+Version `2.3.6` makes onboarding questions context-aware. The hook now classifies the user’s intent (trading strategy, ML model, CLI tool, bot, game, library, etc.) and asks domain-specific questions. "Create a trading strategy" now asks about market, timeframe, language, data source, and output format — not "What type of app are you building?".
+
+## What’s new in v2.3.5
+
+Version `2.3.5` fixes onboarding re-triggering on every new session. The hook now writes `.claude/CLAUDE.md`, `.claude/settings.json`, and `.claudeignore` itself at completion — no longer relying on Claude to do it. This makes the "already onboarded" guard reliable.
 
 ## What’s new in v2.3.4
 

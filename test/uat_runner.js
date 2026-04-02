@@ -210,7 +210,7 @@ for (const [projectKey, project] of Object.entries(PROJECTS)) {
 
     if (!result.output) throw new Error("No output from SessionStart hook");
     const ctx = result.output.hookSpecificOutput.additionalContext;
-    if (!ctx.includes("TOKEN OPTIMIZER v2.3.4")) throw new Error("Missing version header");
+    if (!ctx.includes("TOKEN OPTIMIZER v2.3.7")) throw new Error("Missing version header");
     if (!ctx.includes("MANDATORY RULES")) throw new Error("Missing mandatory rules");
     if (!ctx.includes("SEARCH FIRST")) throw new Error("Missing SEARCH FIRST section");
     if (!ctx.includes("CONCISE OUTPUT")) throw new Error("Missing CONCISE OUTPUT section");
@@ -718,11 +718,11 @@ test("PromptPreprocess: critical compact fires at 85%+ token budget", () => {
   const { writeSessionState } = require("../lib/debug-log");
   try { writeSessionState({}); } catch {}
 
-  // Create a very large synthetic transcript (~85% of 200k = 170k tokens = 680k chars)
+  // Create a very large synthetic transcript (~85% of 1M = 850k tokens = 3.4M chars)
   const dir = createProjectDir("compact-critical-test", {});
   const transcriptPath = path.join(dir, "session.jsonl");
-  const bigContent = "a".repeat(400000); // ~100k tokens user side
-  const bigResponse = "b".repeat(280000); // ~70k tokens assistant side  → total ~170k tokens = 85%
+  const bigContent = "a".repeat(2000000); // ~500k tokens user side
+  const bigResponse = "b".repeat(1400000); // ~350k tokens assistant side  → total ~850k tokens = 85%
   const lines = [
     JSON.stringify({ role: "user", content: bigContent }),
     JSON.stringify({ role: "assistant", content: bigResponse }),
@@ -1122,7 +1122,7 @@ test("Flow: CLAUDE.md reminder frequency reduced (every 5, not 3)", () => {
 cleanup(TEMP_ROOT);
 
 console.log("\n" + "═".repeat(72));
-console.log("  TOKEN OPTIMIZER v2.3.4 - UAT RESULTS");
+console.log("  TOKEN OPTIMIZER v2.3.7 - UAT RESULTS");
 console.log("═".repeat(72));
 
 const maxNameLen = Math.max(...results.tests.map((t) => t.name.length));

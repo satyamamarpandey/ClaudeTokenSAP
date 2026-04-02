@@ -39,12 +39,9 @@ function readJsonStdin() {
     ? `~${tokens.inputTokens.toLocaleString()} in / ~${tokens.outputTokens.toLocaleString()} out / ~${tokens.totalTokens.toLocaleString()} total`
     : null;
 
-  // Write directly to stderr - avoids "Stop says:" prefix in the terminal
   const msg = tokenLine
-    ? `[Token Optimizer] Done. Test it. | Tokens: ${tokenLine}`
-    : `[Token Optimizer] Done. Test it.`;
+    ? `[Token Optimizer] Done. Test it. Ready to test. | Tokens: ${tokenLine}`
+    : `[Token Optimizer] Done. Test it. Ready to test.`;
   process.stderr.write(msg + "\n");
-
-  // Empty stdout - no systemMessage means no "Stop says:" display
-  process.stdout.write("{}");
+  process.stdout.write(JSON.stringify({ systemMessage: msg }));
 })();
